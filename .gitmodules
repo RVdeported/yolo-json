@@ -1,0 +1,3 @@
+[submodule "utxx"]
+	path = utxx
+	url = git@github.com:saleyn/utxx.git
