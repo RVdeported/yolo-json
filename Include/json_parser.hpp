@@ -4,12 +4,18 @@
 //===========================================================================//
 #pragma once
 
+#include <algorithm>
+#include <cassert>
+#include <cctype>
 #include <cmath>
 #include <cstring>
+#include <format>
+#include <iostream>
+#include <limits>
 #include <type_traits>
 #include <utxx/compiler_hints.hpp>
 #include <utxx/convert.hpp>
-#include <utxx/error.hpp>
+// #include <utxx/error.hpp>
 
 //===========================================================================//
 // JSON Parsing Macros:                                                      //
@@ -21,7 +27,7 @@
   {                                                                            \
     curr = std::strchr(curr, ':');                                             \
     if (UNLIKELY(curr == nullptr))                                             \
-      UTXX_THROW_RUNTIME_ERROR("No field value!");                             \
+      std::runtime_error("No field value!");                                   \
     ++curr;                                                                    \
     while (*curr == ' ' || *curr == '\"' || *curr == '\'' || *curr == '\\')    \
       ++curr;                                                                  \
@@ -122,7 +128,7 @@ F ReadDouble(CharPtr a_from, char const * a_to)
   static_assert(std::is_floating_point_v<F> && IsCharPtr<CharPtr>);
   assert(a_from != nullptr && a_to != nullptr && a_from < a_to);
 
-  F v = std::nan;
+  F v = std::numeric_limits<F>::quiet_NaN();
   auto after = utxx::atof<F>(a_from, a_to, v);
   assert(after == a_to);
 
@@ -157,6 +163,7 @@ T ReadNumber(CharPtr a_from, char const * a_to, char a_delimiter)
   char const * cfrom = a_from;
   char const * number_end = std::find(cfrom, a_to, a_delimiter);
   assert(number_end < a_to);
+  assert(*number_end == a_delimiter);
 
   if constexpr (std::is_floating_point_v<T>)
     return ReadDouble<T>(a_from, number_end);
@@ -193,7 +200,7 @@ CharPtr FindVal(char const (&a_key)[N],
 
   // If still not found, it is an error:
   if (UNLIKELY(it == nullptr))
-    UTXX_THROW_RUNTIME_ERROR(a_key, " not found in ", a_begin);
+    std::runtime_error(std::format("{} not found in {}", a_key, a_begin));
 
   // Prior to "it", there must be a fld or msg delimiter:
   assert(*(it - 1) == ',' || *(it - 1) == '{');
