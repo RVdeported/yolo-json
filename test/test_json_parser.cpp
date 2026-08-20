@@ -1,0 +1,172 @@
+//===========================================================================//
+//                    "test_json_parser.cpp":                                //
+//           Tests for Include/json_parser.hpp utilities                     //
+//===========================================================================//
+#include "Include/json_parser.hpp"
+
+#include <gtest/gtest.h>
+
+#include <cstring>
+#include <string>
+
+namespace
+{
+
+//---------------------------------------------------------------------------//
+// "IsCharPtr" type trait:                                                   //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, IsCharPtrTrait)
+{
+  static_assert(JSONParser::IsCharPtr<char *>);
+  static_assert(JSONParser::IsCharPtr<char const *>);
+  static_assert(JSONParser::IsCharPtr<const char *>);
+  static_assert(!JSONParser::IsCharPtr<char>);
+  static_assert(!JSONParser::IsCharPtr<int>);
+  static_assert(!JSONParser::IsCharPtr<std::string>);
+  SUCCEED();
+}
+
+//---------------------------------------------------------------------------//
+// "ReadInt":                                                                //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, ReadInt)
+{
+  char positive[] = "12345234werwdf";
+  EXPECT_EQ(JSONParser::ReadInt<int>(positive, positive + 5), 12345);
+
+  char negative[] = "-42rer245";
+  EXPECT_EQ(JSONParser::ReadInt<int>(negative, negative + 3), -42);
+
+  char zero[] = "0234er5";
+  EXPECT_EQ(JSONParser::ReadInt<long>(zero, zero + 1), 0L);
+}
+
+//---------------------------------------------------------------------------//
+// "ReadDouble":                                                             //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, ReadDouble)
+{
+  char decimal[] = "3.1443rtefg";
+  EXPECT_DOUBLE_EQ(JSONParser::ReadDouble<double>(decimal, decimal + 4), 3.14);
+
+  char integer[] = "42.0ertg";
+  EXPECT_DOUBLE_EQ(JSONParser::ReadDouble<double>(integer, integer + 3), 42.0);
+
+  char negative[] = "-0.554.fgdfg";
+  EXPECT_DOUBLE_EQ(JSONParser::ReadDouble<double>(negative, negative + 4),
+                   -0.5);
+}
+
+//---------------------------------------------------------------------------//
+// "ReadNumber":                                                             //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, ReadNumber)
+{
+  char i[] = "123,erte5t3";
+  EXPECT_EQ(JSONParser::ReadNumber<int>(i, i + 7, ','), 123);
+
+  char d[] = "3.14,45tert";
+  EXPECT_DOUBLE_EQ(JSONParser::ReadNumber<double>(d, d + 7, ','), 3.14);
+  //
+  char neg[] = "-7|452wtrt";
+  EXPECT_EQ(JSONParser::ReadNumber<int>(neg, neg + 7, '|'), -7);
+}
+
+//---------------------------------------------------------------------------//
+// "FindVal" (InclSep = true, the default): key carries the ':' separator:   //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, FindValWithSeparator)
+{
+  char msg[] = R"({"\"price\":333,price:88","price":10})";
+  const char * v = JSONParser::FindVal(R"("price":)", msg, msg);
+  EXPECT_STREQ(v, "10}");
+}
+
+//---------------------------------------------------------------------------//
+// "FindVal" (InclSep = false): key is the bare quoted field name:           //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, FindValWithoutSeparator)
+{
+  char msg[] = R"({"\"price\":333,price:88","price":10})";
+  constexpr char key[] = "\"price\"";
+  const char * v = JSONParser::FindVal<sizeof(key), false>(key, msg, msg);
+  EXPECT_STREQ(v, "10}");
+}
+
+//---------------------------------------------------------------------------//
+// "FindVal" skips the opening quote of a quoted value (InclSep = false):    //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, FindValQuotedValue)
+{
+  char msg[] = R"({"name":"foo"})";
+  constexpr char key[] = "\"name\"";
+  const char * v = JSONParser::FindVal<sizeof(key), false>(key, msg, msg);
+  EXPECT_STREQ(v, "foo\"}");
+}
+
+//---------------------------------------------------------------------------//
+// "FindVal" searches forward from the hint, then wraps to the beginning:    //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, FindValSearchesFromHint)
+{
+  char msg[] = R"({"a":1,"b":2})";
+  char * hint = std::strstr(msg, R"("b")");
+  ASSERT_NE(hint, nullptr);
+  const char * v = JSONParser::FindVal(R"("a":)", hint, msg);
+  EXPECT_STREQ(v, R"(1,"b":2})");
+}
+
+//---------------------------------------------------------------------------//
+// "FindVal" throws when the key is absent:                                  //
+//---------------------------------------------------------------------------//
+// TEST(JsonParserTest, FindValNotFoundThrows)
+// {
+//   char msg[] = R"({"price":10})";
+//   EXPECT_THROW(JSONParser::FindVal(R"("missing":)", msg, msg),
+//                std::runtime_error);
+// }
+
+//---------------------------------------------------------------------------//
+// String scanning macros: CMP_STR, SKP_IF_STR, SKP_STR:                     //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, StringScanMacros)
+{
+  char buf[] = "foobar";
+  char * curr = buf;
+
+  EXPECT_TRUE(SKP_IF_STR("foo"));
+  EXPECT_STREQ(curr, "bar");
+
+  EXPECT_FALSE(SKP_IF_STR("xyz"));
+  EXPECT_STREQ(curr, "bar");
+
+  SKP_STR("bar");
+  EXPECT_EQ(curr, buf + 6);
+
+  const char * m = "hello world";
+  const char * p = m;
+  EXPECT_TRUE(CMP_STR(p, "hello"));
+  EXPECT_EQ(p, m + 5);
+  EXPECT_FALSE(CMP_STR(p, "xyz"));
+  EXPECT_EQ(p, m + 5);
+}
+
+//---------------------------------------------------------------------------//
+// "GET_BOOL" macro:                                                         //
+//---------------------------------------------------------------------------//
+TEST(JsonParserTest, GetBoolMacro)
+{
+  char t[] = "true3455";
+  char * curr = t;
+  GET_BOOL(b);
+  EXPECT_TRUE(b);
+  EXPECT_EQ(curr, t + 4);
+
+  char f[] = "falseghfghy";
+  curr = f;
+  GET_BOOL(b2);
+  EXPECT_FALSE(b2);
+  EXPECT_EQ(curr, f + 5);
+}
+
+} // namespace
