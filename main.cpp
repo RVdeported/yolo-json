@@ -17,7 +17,7 @@ struct B
   std::vector<int> arr{1, 2, 3, 4, 5};
 };
 
-struct A
+struct [[=yjson::Size<20>{}, =yjson::Alphabetical<false>{}]] A
 {
   int a = 5;
   int c = 9;
@@ -34,7 +34,7 @@ concept basic_json_type =
 
 template <class T>
 concept json_array_back_type = requires(T a) {
-  a.begin();
+
   a.end();
   a.emplace_back();
 };
@@ -142,7 +142,9 @@ int main()
   std::cout << int('0') << '\n';
   std::cout << int(',') << '\n';
 
-  constexpr auto infoo = yjson::GetOrderedField<A, 1>();
+  yjson::GetOrderedField<A, 1>();
+  
+  auto s = yjson::StructAnnots::MkAnnots<A>();
   // template for (constexpr auto v : tmplts)
   // {
   //   // if constexpr (std::meta::has_identifier(v))
