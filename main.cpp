@@ -18,10 +18,10 @@ struct B
   std::vector<int> arr{1, 2, 3, 4, 5};
 };
 
-struct[[ = yjson::NotCompressed{}, = yjson::Alphabetical{true} ]] A
+struct[[= yjson::NotCompressed{}]] A
 {
   [[= yjson::Position{10}]] int a = 5;
-  int c = 9;
+  [[= yjson::Position{0}]] int c = 9;
   std::string ss = "temp";
   B s;
   bool bb = false;
@@ -142,10 +142,10 @@ int main()
   std::cout << int('0') << '\n';
   std::cout << int(',') << '\n';
 
-  yjson::GetOrderedField<A, 1>();
+  // yjson::GetOrderedField<A, 1>();
 
   constexpr auto s = yjson::StructAnnots::MkStrAnnots<A>();
-  static_assert(s.m_alphabetical.value());
+  // static_assert(s.m_alphabetical.value());
   static_assert(!s.m_compressed);
 
   // constexpr auto v = yjson::FieldAnnots::MkFldAnnots<A>();
@@ -153,6 +153,19 @@ int main()
 
   constexpr auto ss = yjson::FieldAnnots::MkFldAnnots<A>();
   static_assert(ss[0].m_pos == 10);
+
+  constexpr auto have = yjson::GetOrderedField<A>();
+  for (auto & v : have)
+    std::cout << v << "|";
+  std::cout << '\n';
+  static_assert(have[0] == 1);
+
+  constexpr auto so = yjson::SortFieldsAlphabetically<A>();
+  for (auto & v : so)
+    std::cout << v << "|";
+  std::cout << '\n';
+
+  // static_assert(have[1] == -1);
   // template for (constexpr auto v : ss)
   // {
   //   // if constexpr (std::meta::has_identifier(v))
