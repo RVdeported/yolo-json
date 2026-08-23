@@ -1,6 +1,7 @@
 #include "Include/annotations.hpp"
 // #include "Include/json_parser.hpp"
 #include <Include/parser.hpp>
+#include <cassert>
 #include <cstddef>
 #include <fstream>
 #include <iostream>
@@ -17,9 +18,9 @@ struct B
   std::vector<int> arr{1, 2, 3, 4, 5};
 };
 
-struct [[=yjson::Size<20>{}, =yjson::Alphabetical<false>{}]] A
+struct[[ = yjson::NotCompressed{}, = yjson::Alphabetical{true} ]] A
 {
-  int a = 5;
+  [[= yjson::Position{10}]] int a = 5;
   int c = 9;
   std::string ss = "temp";
   B s;
@@ -34,7 +35,6 @@ concept basic_json_type =
 
 template <class T>
 concept json_array_back_type = requires(T a) {
-
   a.end();
   a.emplace_back();
 };
@@ -117,22 +117,22 @@ int main()
   // std::ostream ss(tmp.data());
   // print_(a, std::cout);
 
-  yjson::DisplayName<"TEST"> name;
-  constexpr auto info = ^^yjson::DisplayName<"TEST">;
-  constexpr static auto tmplts =
-      std::define_static_array(std::meta::template_arguments_of(info));
-  template for (constexpr auto v : tmplts)
-  {
-    // if constexpr (std::meta::has_identifier(v))
-    {
-      constexpr auto name = std::meta::display_string_of(std::meta::type_of(v));
-      std::cout << name << '\n';
-      std::cout << [:v:].data << '\n';
-
-      // constexpr bool aaa = (std::meta::type_of(v) ==
-      //                       std::meta::type_of(^^yjson::CompTimeStr<5>));
-    }
-  }
+  // yjson::DisplayName<"TEST"> name;
+  // constexpr auto info = ^^yjson::DisplayName<"TEST">;
+  // constexpr static auto tmplts =
+  //     std::define_static_array(std::meta::template_arguments_of(info));
+  // template for (constexpr auto v : tmplts)
+  // {
+  //   // if constexpr (std::meta::has_identifier(v))
+  //   {
+  //     constexpr auto name =
+  //     std::meta::display_string_of(std::meta::type_of(v)); std::cout << name
+  //     << '\n'; std::cout << [:v:].data << '\n';
+  //
+  //     // constexpr bool aaa = (std::meta::type_of(v) ==
+  //     //                       std::meta::type_of(^^yjson::CompTimeStr<5>));
+  //   }
+  // }
 
   float bb = 1.3432;
   constexpr auto i = ^^float;
@@ -143,15 +143,22 @@ int main()
   std::cout << int(',') << '\n';
 
   yjson::GetOrderedField<A, 1>();
-  
-  auto s = yjson::StructAnnots::MkAnnots<A>();
-  // template for (constexpr auto v : tmplts)
+
+  constexpr auto s = yjson::StructAnnots::MkStrAnnots<A>();
+  static_assert(s.m_alphabetical.value());
+  static_assert(!s.m_compressed);
+
+  // constexpr auto v = yjson::FieldAnnots::MkFldAnnots<A>();
+  // assert(v.m_pos == 10);
+
+  constexpr auto ss = yjson::FieldAnnots::MkFldAnnots<A>();
+  static_assert(ss[0].m_pos == 10);
+  // template for (constexpr auto v : ss)
   // {
   //   // if constexpr (std::meta::has_identifier(v))
   //   {
-  //     constexpr auto name =
-  //     std::meta::display_string_of(std::meta::type_of(v)); std::cout << name
-  //     << '\n'; std::cout << [:v:].data << '\n';
+  //     // std::cout << name << '\n';
+  //     // std::cout << [:v:].data << '\n';
   //
   //     // constexpr bool aaa = (std::meta::type_of(v) ==
   //     //                       std::meta::type_of(^^yjson::CompTimeStr<5>));
