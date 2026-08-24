@@ -174,11 +174,11 @@ TEST(JsonParserTest, GetBoolMacro)
 //---------------------------------------------------------------------------//
 TEST(JsonParserTest, GetStrSimple)
 {
-  char buf[] = "hello\"world";
+  char buf[] = "\"hello\"world";
   char * curr = buf;
   GET_STR(s);
   EXPECT_STREQ(s, "hello");
-  EXPECT_EQ(curr, buf + 6);
+  EXPECT_EQ(curr, buf + 7);
 }
 
 //---------------------------------------------------------------------------//
@@ -186,11 +186,11 @@ TEST(JsonParserTest, GetStrSimple)
 //---------------------------------------------------------------------------//
 TEST(JsonParserTest, GetStrWithEscapedQuote)
 {
-  char buf[] = "foo\\\"bar\"tail";
+  char buf[] = "\"foo\\\"bar\"tail";
   char * curr = buf;
   GET_STR(s);
   EXPECT_STREQ(s, "foo\\\"bar");
-  EXPECT_EQ(curr, buf + 9);
+  EXPECT_EQ(curr, buf + 10);
 }
 
 //---------------------------------------------------------------------------//
@@ -198,11 +198,11 @@ TEST(JsonParserTest, GetStrWithEscapedQuote)
 //---------------------------------------------------------------------------//
 TEST(JsonParserTest, GetStrWithEscapedBackslash)
 {
-  char buf[] = "foo\\\\bar\"tail";
+  char buf[] = "\"foo\\\\bar\"tail";
   char * curr = buf;
   GET_STR(s);
   EXPECT_STREQ(s, "foo\\\\bar");
-  EXPECT_EQ(curr, buf + 9);
+  EXPECT_EQ(curr, buf + 10);
 }
 
 //---------------------------------------------------------------------------//
@@ -211,7 +211,7 @@ TEST(JsonParserTest, GetStrWithEscapedBackslash)
 TEST(JsonParserTest, GetStrEmpty)
 {
   char buf[] = "\"\"tail";
-  char * curr = buf + 1;
+  char * curr = buf;
   GET_STR(s);
   EXPECT_STREQ(s, "");
   EXPECT_EQ(curr, buf + 2);
@@ -257,7 +257,7 @@ TEST(JsonParserTest, SkipValNegativeInt)
 TEST(JsonParserTest, SkipValString)
 {
   char msg[] = "\"hello\",42";
-  char * v = JSONParser::SkipVal<std::string>(msg + 1, msg + 11, ',');
+  char * v = JSONParser::SkipVal<std::string>(msg, msg + 11, ',');
   EXPECT_EQ(v, msg + 7);
   EXPECT_EQ(*v, ',');
   EXPECT_STREQ(msg + 1, "hello");
@@ -266,7 +266,7 @@ TEST(JsonParserTest, SkipValString)
 TEST(JsonParserTest, SkipValStringWithMin)
 {
   char msg[] = "\"hello\",42";
-  char * v = JSONParser::SkipVal<std::string>(msg + 1, msg + 11, ',', 5);
+  char * v = JSONParser::SkipVal<std::string>(msg, msg + 11, ',', 5);
   EXPECT_EQ(v, msg + 7);
   EXPECT_EQ(*v, ',');
   EXPECT_STREQ(msg + 1, "hello");

@@ -68,7 +68,7 @@
 // "GET_STR": "Var" will hold a 0-terminated string:                         //
 //---------------------------------------------------------------------------//
 #define GET_STR(Var)                                                           \
-  char const * Var = curr;                                                     \
+  char const * Var = ++curr;                                                   \
   while (true)                                                                 \
   {                                                                            \
     short slash_cnt = 0;                                                       \
@@ -155,7 +155,8 @@ I ReadInt(CharPtr a_from, char const * a_to)
 // "ReadNumber":                                                           //
 //-------------------------------------------------------------------------//
 template <typename T, typename CharPtr>
-T ReadNumber(CharPtr a_from, char const * a_to, char a_delimiter, int a_min_len = 0)
+T ReadNumber(CharPtr a_from, char const * a_to, char a_delimiter,
+             int a_min_len = 0)
 {
   static_assert(IsCharPtr<CharPtr>);
   assert(a_from != nullptr && a_to != nullptr && a_from + a_min_len < a_to);
@@ -222,10 +223,11 @@ CharPtr FindVal(char const (&a_key)[N],
 
 // Skip of the base val
 template <typename T, typename CharPtr>
-CharPtr SkipVal(CharPtr a_from, char const * a_to, char a_delimiter, int a_min_len = 0)
+CharPtr SkipVal(CharPtr a_from, char const * a_to, char a_delimiter,
+                int a_min_len = 0)
 {
   char * curr = a_from;
-  if constexpr(std::is_floating_point_v<T> || std::is_integral_v<T>)
+  if constexpr (std::is_floating_point_v<T> || std::is_integral_v<T>)
   {
     char const * cfrom = a_from;
     assert(a_from + a_min_len < a_to);
@@ -234,6 +236,7 @@ CharPtr SkipVal(CharPtr a_from, char const * a_to, char a_delimiter, int a_min_l
   }
   else
   {
+    assert(*curr == '"');
     assert(a_min_len >= 0);
     curr += a_min_len;
     GET_STR(_);
