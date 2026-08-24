@@ -18,6 +18,7 @@ ENDIF()
 #=============================================================================#
 SET(PROJ_NAME areg-backtest)
 set(CMAKE_CXX_STANDARD 26)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON)
 PROJECT($PROJ_NAME LANGUAGES CXX)
 
 # Generate identity string for this build:
@@ -45,6 +46,31 @@ Commit\t${COMMIT_NAME}\nTime\t${DATE}\n")
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${LIB_DIR}")
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${LIB_DIR}")
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${BIN_DIR}")
+# ==========================================================
+# DISPLAY CONFIGURATIONS
+# ==========================================================
+message(STATUS "=======================================================")
+message(STATUS "Compiler Configuration:")
+message(STATUS "  Compiler ID:      ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "  Compiler Version: ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "  Compiler Path:    ${CMAKE_CXX_COMPILER}")
+message(STATUS "-------------------------------------------------------")
+
+message(STATUS "Git Information:")
+message(STATUS "  Branch:           ${GIT_BRANCH}")
+message(STATUS "  Commit Hash:      ${GIT_COMMIT_HASH}")
+message(STATUS "  Last Commit By:   ${GIT_LAST_COMMIT_AUTHOR}")
+message(STATUS "  Last Commit Date: ${GIT_LAST_COMMIT_DATE}")
+message(STATUS "  Last Commit Msg:  ${GIT_LAST_COMMIT_MESSAGE}")
+message(STATUS "-------------------------------------------------------")
+
+message(STATUS "Build Configuration:")
+message(STATUS "  Build Type:       ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Architecture:     ${CMAKE_SYSTEM_PROCESSOR} (64-bit: ${BUILD_64BIT})")
+message(STATUS "  C++ Standard:     C++${CMAKE_CXX_STANDARD}")
+message(STATUS "=======================================================")
+message(STATUS "  CFLAGS:    ${CXXFLAGS}")
+
 
 
 #=============================================================================#
@@ -65,7 +91,7 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
 
 ADD_EXECUTABLE(main main.cpp)
 # TARGET_LINK_LIBRARIES(main PRIVATE )
-TARGET_COMPILE_OPTIONS(main PRIVATE "-freflection" ${CXXFLAGS})
+TARGET_COMPILE_OPTIONS(main PRIVATE "-freflection" "-std=c++26"  ${CXXFLAGS})
 
 #=============================================================================#
 # Tests (GoogleTest):                                                         #

@@ -164,7 +164,20 @@ int main()
   for (auto & v : so)
     std::cout << v << "|";
   std::cout << '\n';
+    
+  constexpr float aaa = 3.45;
+  // constexpr A bbb{};
+  constexpr std::vector<int> ccc{};
+  std::cout << std::meta::is_integral_type(^^int)  << '\n';
+  std::cout << std::meta::is_floating_point_type(^^float)  << '\n';
+  std::cout << std::meta::is_array_type(^^std::vector<int>)  << '\n';
+  std::cout << std::meta::is_object(^^aaa)  << '\n';
 
+  constexpr bool ooo = yjson::IsContainer<^^std::vector<int>>();
+  static_assert(ooo);
+  static_assert(yjson::IsBase<^^float>());
+  static_assert(yjson::IsBase<^^bool>());
+  static_assert(yjson::IsBase<^^std::string>());
   // static_assert(have[1] == -1);
   // template for (constexpr auto v : ss)
   // {

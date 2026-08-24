@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iostream>
 #include <meta>
 #include <optional>
 #include <ranges>
@@ -72,6 +73,16 @@ template <typename T> consteval auto GetRelFields()
   return std::define_static_array(std::views::filter(
       flds, [](auto & v)
       { return std::meta::has_identifier(v) && !std::meta::is_function(v); }));
+}
+
+template <std::meta::info T> consteval auto GetRelFuncs()
+{
+  constexpr auto flds = std::define_static_array(
+      std::meta::members_of(T, std::meta::access_context::unchecked()));
+
+  return std::define_static_array(std::views::filter(
+      flds, [](auto & v)
+      { return std::meta::has_identifier(v) && std::meta::is_function(v); }));
 }
 
 //----------------------//
@@ -262,8 +273,8 @@ template <typename T> consteval auto SortFieldsAlphabetically()
 
   // Indices to sort (identity permutation):
   std::array<int, n> order{};
-  template for (constexpr auto i : std::views::indices(n))
-    order[i] = static_cast<int>(i);
+  template for (constexpr auto i : std::views::indices(n)) order[i] =
+      static_cast<int>(i);
 
   std::sort(order.begin(), order.end(),
             [&](int a, int b) { return compare_str_ci(keys[a], keys[b]) < 0; });
@@ -274,4 +285,29 @@ template <typename T> consteval auto SortFieldsAlphabetically()
   return order;
 }
 
+template <std::meta::info T> consteval bool HasFuncWithName(std::string_view s)
+{
+  constexpr auto funcs = GetRelFuncs<T>();
+  return std::ranges::contains(funcs, s, std::meta::identifier_of);
+
+}
+
+template <std::meta::info T> consteval bool IsContainer()
+{
+  constexpr auto funcs = GetRelFuncs<T>();
+  constexpr bool has_begin = HasFuncWithName<T>("begin");
+  constexpr bool has_end = HasFuncWithName<T>("end");
+  constexpr bool has_push_b = HasFuncWithName<T>("push_back");
+  constexpr bool has_push = HasFuncWithName<T>("push");
+
+  return has_begin && has_end && (has_push_b | has_push);
+}
+
+template <std::meta::info T> consteval bool IsBase()
+{
+  constexpr bool integral = std::meta::is_integral_type(T);
+  constexpr bool floating = std::meta::is_floating_point_type(T);
+  constexpr bool stringal = T == ^^std::string;
+  return integral || floating || stringal;
+}
 } // namespace yjson
