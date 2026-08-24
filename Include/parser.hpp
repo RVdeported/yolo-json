@@ -1,12 +1,14 @@
 #include "Include/annotations.hpp"
+#include "Include/json_parser.hpp"
 #include "Include/utils.hpp"
+#include <cassert>
 #include <iostream>
 #include <meta>
 #include <print>
 #include <ranges>
 #include <span>
+#include <utility>
 #include <vector>
-#include <cassert>
 
 namespace yjson
 {
@@ -79,20 +81,44 @@ template <class T> consteval auto GetOrderedField()
   return out;
 }
 
-// template<std::meta::info T, > std::pair<char *, typename [:T:]> ParseBase(char * curr)
-// {
-//   static_assert(IsBase<T>());
-//   if constexpr() 
-//
-//   return {nullptr, {}};
-// }
-//
-// template<std::meta::info T> char * ParseJson(char * curr)
-// {
-//   assert(curr);
-//   char * start = curr;
-//
-//   return curr; 
-// }
+template <std::meta::info T, char Delim = ',', bool Ignore = false,
+          int MinSz = 0, int FxSz = -1>
+std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
+{
+  static_assert(IsBase<T>());
+  constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
+  if constexpr (Ignore)
+  {
+    char * after = JSONParser::SkipVal<typename[:T:]>(curr, end, Delim, AddLen);
+    assert(*after == Delim);
+    return {after, typename[:T:]{}};
+  }
+  else
+  {
+    if constexpr (T == ^^std::string)
+    {
+      GET_STR(Out);
+      assert(*curr == Delim);
+      return {curr, typename[:T:](Out)};
+    }
+    else
+    {
+      auto [val, after] =
+          JSONParser::ReadNumber<typename[:T:]>(curr, end, Delim);
+      assert(*after == Delim);
+
+      return {after, val};
+    }
+  }
+  std::unreachable();
+}
+
+template <std::meta::info T> char * ParseJson(char * curr)
+{
+  assert(curr);
+  char * start = curr;
+
+  return curr;
+}
 
 } // namespace yjson

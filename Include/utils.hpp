@@ -289,7 +289,6 @@ template <std::meta::info T> consteval bool HasFuncWithName(std::string_view s)
 {
   constexpr auto funcs = GetRelFuncs<T>();
   return std::ranges::contains(funcs, s, std::meta::identifier_of);
-
 }
 
 template <std::meta::info T> consteval bool IsBase();
@@ -312,5 +311,29 @@ template <std::meta::info T> consteval bool IsBase()
   constexpr bool floating = std::meta::is_floating_point_type(T);
   constexpr bool stringal = T == ^^std::string;
   return integral || floating || stringal;
+}
+
+template <std::meta::info T> consteval bool IsVariant()
+{
+  try
+  {
+    return std::meta::template_of(T) == ^^std::variant;
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+
+template <std::meta::info T> consteval bool IsOption()
+{
+  try
+  {
+    return std::meta::template_of(T) == ^^std::optional;
+  }
+  catch (...)
+  {
+    return false;
+  }
 }
 } // namespace yjson

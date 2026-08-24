@@ -63,13 +63,14 @@ TEST(JsonParserTest, ReadDouble)
 TEST(JsonParserTest, ReadNumber)
 {
   char i[] = "123,erte5t3";
-  EXPECT_EQ(JSONParser::ReadNumber<int>(i, i + 7, ',', 3), 123);
+  EXPECT_EQ(JSONParser::ReadNumber<int>(i, i + 7, ',', 3).first, 123);
 
   char d[] = "3.14,45tert";
-  EXPECT_DOUBLE_EQ(JSONParser::ReadNumber<double>(d, d + 7, ',', 2), 3.14);
+  EXPECT_DOUBLE_EQ(JSONParser::ReadNumber<double>(d, d + 7, ',', 2).first,
+                   3.14);
   //
   char neg[] = "-7|452wtrt";
-  EXPECT_EQ(JSONParser::ReadNumber<int>(neg, neg + 7, '|'), -7);
+  EXPECT_EQ(JSONParser::ReadNumber<int>(neg, neg + 7, '|').first, -7);
 }
 
 //---------------------------------------------------------------------------//

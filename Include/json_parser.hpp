@@ -155,21 +155,25 @@ I ReadInt(CharPtr a_from, char const * a_to)
 // "ReadNumber":                                                           //
 //-------------------------------------------------------------------------//
 template <typename T, typename CharPtr>
-T ReadNumber(CharPtr a_from, char const * a_to, char a_delimiter,
-             int a_min_len = 0)
+std::pair<T, char *> ReadNumber(CharPtr a_from, char const * a_to,
+                                char a_delimiter, int a_min_len = 0)
 {
   static_assert(IsCharPtr<CharPtr>);
   assert(a_from != nullptr && a_to != nullptr && a_from + a_min_len < a_to);
 
-  char const * cfrom = a_from + a_min_len;
-  char const * number_end = std::find(cfrom, a_to, a_delimiter);
+  char * cfrom = a_from + a_min_len;
+  char * number_end =
+      cfrom + (std::find((char const *)cfrom, a_to, a_delimiter) - cfrom);
   assert(number_end < a_to);
   assert(*number_end == a_delimiter);
 
+  T res;
   if constexpr (std::is_floating_point_v<T>)
-    return ReadDouble<T>(a_from, number_end);
+    res = ReadDouble<T>(a_from, number_end);
   else
-    return ReadInt<T>(a_from, number_end);
+    res = ReadInt<T>(a_from, number_end);
+
+  return std::pair{res, number_end};
 }
 
 //-------------------------------------------------------------------------//
@@ -245,4 +249,4 @@ CharPtr SkipVal(CharPtr a_from, char const * a_to, char a_delimiter,
   }
 }
 } // namespace JSONParser
-// End namespace JSONParser
+// End namespace JSONParRead
