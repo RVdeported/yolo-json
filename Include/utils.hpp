@@ -292,15 +292,18 @@ template <std::meta::info T> consteval bool HasFuncWithName(std::string_view s)
 
 }
 
+template <std::meta::info T> consteval bool IsBase();
+
 template <std::meta::info T> consteval bool IsContainer()
 {
   constexpr auto funcs = GetRelFuncs<T>();
+  constexpr bool is_base = IsBase<T>();
   constexpr bool has_begin = HasFuncWithName<T>("begin");
   constexpr bool has_end = HasFuncWithName<T>("end");
   constexpr bool has_push_b = HasFuncWithName<T>("push_back");
   constexpr bool has_push = HasFuncWithName<T>("push");
 
-  return has_begin && has_end && (has_push_b | has_push);
+  return !is_base && has_begin && has_end && (has_push_b | has_push);
 }
 
 template <std::meta::info T> consteval bool IsBase()
