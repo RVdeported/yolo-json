@@ -74,14 +74,14 @@
     short slash_cnt = 0;                                                       \
     curr = std::strchr(curr, '"');                                             \
     assert(curr != nullptr);                                                   \
-    while (*(--curr) != '\\')                                                  \
+    while (*(--curr) == '\\')                                                  \
     {                                                                          \
       slash_cnt++;                                                             \
     }                                                                          \
     curr += slash_cnt + 1;                                                     \
     if (slash_cnt % 2 == 0)                                                    \
       break;                                                                   \
-    Var = ++curr;                                                              \
+    ++curr;                                                                    \
   }                                                                            \
   /* 0-terminate the Var string: */                                            \
   *curr = '\0';                                                                \
@@ -155,12 +155,12 @@ I ReadInt(CharPtr a_from, char const * a_to)
 // "ReadNumber":                                                           //
 //-------------------------------------------------------------------------//
 template <typename T, typename CharPtr>
-T ReadNumber(CharPtr a_from, char const * a_to, char a_delimiter)
+T ReadNumber(CharPtr a_from, char const * a_to, char a_delimiter, int a_min_len = 0)
 {
   static_assert(IsCharPtr<CharPtr>);
-  assert(a_from != nullptr && a_to != nullptr && a_from < a_to);
+  assert(a_from != nullptr && a_to != nullptr && a_from + a_min_len < a_to);
 
-  char const * cfrom = a_from;
+  char const * cfrom = a_from + a_min_len;
   char const * number_end = std::find(cfrom, a_to, a_delimiter);
   assert(number_end < a_to);
   assert(*number_end == a_delimiter);
@@ -218,6 +218,28 @@ CharPtr FindVal(char const (&a_key)[N],
       ++it;
   }
   return it;
+}
+
+// Skip of the base val
+template <typename T, typename CharPtr>
+CharPtr SkipVal(CharPtr a_from, char const * a_to, char a_delimiter, int a_min_len = 0)
+{
+  char * curr = a_from;
+  if constexpr(std::is_floating_point_v<T> || std::is_integral_v<T>)
+  {
+    char const * cfrom = a_from;
+    assert(a_from + a_min_len < a_to);
+    char const * end = std::find(cfrom + a_min_len, a_to, a_delimiter);
+    return a_from + (end - cfrom);
+  }
+  else
+  {
+    assert(a_min_len >= 0);
+    curr += a_min_len;
+    GET_STR(_);
+    assert(*curr == a_delimiter);
+    return curr;
+  }
 }
 } // namespace JSONParser
 // End namespace JSONParser

@@ -6,17 +6,10 @@
 #include <ranges>
 #include <span>
 #include <vector>
+#include <cassert>
 
 namespace yjson
 {
-
-// template <typename T> consteval std::span<const std::meta::info> GetMembers()
-// {
-//   return std::define_static_array(
-//       std::meta::members_of(^^T, std::meta::access_context::unchecked()));
-// }
-// template <typename T> T Parse(const char * a_in, int sz = -1) { return T{}; }
-
 template <class T> consteval auto GetOrderedField()
 {
   //--------------------------------------------------------//
@@ -85,4 +78,21 @@ template <class T> consteval auto GetOrderedField()
 
   return out;
 }
+
+// template<std::meta::info T, > std::pair<char *, typename [:T:]> ParseBase(char * curr)
+// {
+//   static_assert(IsBase<T>());
+//   if constexpr() 
+//
+//   return {nullptr, {}};
+// }
+//
+// template<std::meta::info T> char * ParseJson(char * curr)
+// {
+//   assert(curr);
+//   char * start = curr;
+//
+//   return curr; 
+// }
+
 } // namespace yjson
