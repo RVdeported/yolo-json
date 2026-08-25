@@ -44,6 +44,19 @@
   }
 
 //---------------------------------------------------------------------------//
+// "SKP_STR_SV": Skip a std::string_view along with its enclosing quotes:    //
+//---------------------------------------------------------------------------//
+#define SKP_STR_SV(Sv)                                                        \
+  {                                                                           \
+    assert(*curr == '"');                                                     \
+    ++curr;                                                                   \
+    assert(std::memcmp(Sv.data(), curr, Sv.size()) == 0);                     \
+    curr += Sv.size();                                                        \
+    assert(*curr == '"');                                                     \
+    ++curr;                                                                   \
+  }
+
+//---------------------------------------------------------------------------//
 // "SKP_IF_STR": Compare with fixed (known) string and shift "Msg" pointer   //
 //               if true                                                     //
 //---------------------------------------------------------------------------//
@@ -130,7 +143,6 @@ F ReadDouble(CharPtr a_from, char const * a_to)
 
   F v = std::numeric_limits<F>::quiet_NaN();
   auto after = utxx::atof<F>(a_from, a_to, v);
-  assert(after == a_to);
 
   return v;
 }
@@ -146,7 +158,6 @@ I ReadInt(CharPtr a_from, char const * a_to)
 
   I v = 0;
   auto after = utxx::fast_atoi<I, false>(a_from, a_to, v);
-  assert(after == a_to);
 
   return v;
 }

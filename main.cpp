@@ -23,9 +23,6 @@ struct[[= yjson::NotCompressed{}]] A
   [[= yjson::Position{10}]] int a = 5;
   [[= yjson::Position{0}]] int c = 9;
   std::string ss = "temp";
-  B s;
-  bool bb = false;
-  bool tt = true;
 };
 
 template <class T>
@@ -109,87 +106,12 @@ template <typename T> void print_(T & A, std::ostream & stream)
 
 int main()
 {
-  A a;
-  // std::cout << std::is_aggregate<A>() << '\n';
-  // std::cout << std::is_aggregate<std::vector<int>>() << '\n';
-  // std::cout << std::is_aggregate<std::string>() << '\n';
-  // std::string tmp; tmp.reserve(150);
-  // std::ostream ss(tmp.data());
-  // print_(a, std::cout);
 
-  // yjson::DisplayName<"TEST"> name;
-  // constexpr auto info = ^^yjson::DisplayName<"TEST">;
-  // constexpr static auto tmplts =
-  //     std::define_static_array(std::meta::template_arguments_of(info));
-  // template for (constexpr auto v : tmplts)
-  // {
-  //   // if constexpr (std::meta::has_identifier(v))
-  //   {
-  //     constexpr auto name =
-  //     std::meta::display_string_of(std::meta::type_of(v)); std::cout << name
-  //     << '\n'; std::cout << [:v:].data << '\n';
-  //
-  //     // constexpr bool aaa = (std::meta::type_of(v) ==
-  //     //                       std::meta::type_of(^^yjson::CompTimeStr<5>));
-  //   }
-  // }
-
-  float bb = 1.3432;
-  constexpr auto i = ^^float;
-  using F = typename[:^^float:];
-  F r = 3.456;
-  static_assert(std::is_same_v<float, F>);
-  std::cout << int('0') << '\n';
-  std::cout << int(',') << '\n';
-
-  // yjson::GetOrderedField<A, 1>();
-
-  constexpr auto s = yjson::StructAnnots::MkStrAnnots<A>();
-  // static_assert(s.m_alphabetical.value());
-  static_assert(!s.m_compressed);
-
-  // constexpr auto v = yjson::FieldAnnots::MkFldAnnots<A>();
-  // assert(v.m_pos == 10);
-
-  constexpr auto ss = yjson::FieldAnnots::MkFldAnnots<A>();
-  static_assert(ss[0].m_pos == 10);
-
-  constexpr auto have = yjson::GetOrderedField<A>();
-  for (auto & v : have)
-    std::cout << v << "|";
-  std::cout << '\n';
-  static_assert(have[0] == 1);
-
-  constexpr auto so = yjson::SortFieldsAlphabetically<A>();
-  for (auto & v : so)
-    std::cout << v << "|";
-  std::cout << '\n';
-
-  constexpr float aaa = 3.45;
-  // constexpr A bbb{};
-  constexpr std::vector<int> ccc{};
-  std::cout << std::meta::is_integral_type(^^int) << '\n';
-  std::cout << std::meta::is_floating_point_type(^^float) << '\n';
-  std::cout << std::meta::is_array_type(^^std::vector<int>) << '\n';
-  std::cout << std::meta::is_object(^^aaa) << '\n';
-
-  constexpr bool ooo = yjson::IsContainer<^^std::vector<int>>();
-  static_assert(ooo);
-  static_assert(yjson::IsBase<^^float>());
-  static_assert(yjson::IsBase<^^bool>());
-  static_assert(yjson::IsBase<^^std::string>());
-  static_assert(yjson::IsVariant<^^std::variant<int, float>>());
-  static_assert(yjson::IsOption<^^std::optional<float>>());
-
-  std::string test = "\"terminate\"}3.16,";
-  auto res = yjson::ParseBase<^^std::string, '}'>(test.data(),
-                                                  test.data() + test.size());
-  std::cout << res.second << '\n';
-  auto res2 = yjson::ParseBase<^^double, ','>(res.first + 1, res.first + 20);
-  std::cout << res2.second << '\n';
-
-  assert(res.second == "terminate");
-  assert(res2.second == 3.16);
+  std::string test = "{\"c\":34,\"a\":35,\"ss\":\"test\"}";
+    
+  auto [rest, a] = yjson::ParseJson<^^A>(test.data(), test.data() + test.size());
+  
+  std::cout << a.c << "|" << a.a << "|" << a.ss << '\n';
   // static_assert(have[1] == -1);
   // template for (constexpr auto v : ss)
   // {

@@ -62,10 +62,12 @@ TEST(JsonParserTest, ReadDouble)
 //---------------------------------------------------------------------------//
 TEST(JsonParserTest, ReadNumber)
 {
-  char i[] = "123,erte5t3";
-  EXPECT_EQ(JSONParser::ReadNumber<int>(i, i + 7, ',', 3).first, 123);
+  char i[] = "123  ,erte5t3";
+  auto [val, next] = JSONParser::ReadNumber<int>(i, i + 7, ',', 3);
+  EXPECT_EQ(val, 123);
+  EXPECT_EQ(*next, ',');
 
-  char d[] = "3.14,45tert";
+  char d[] = "3.14  ,45tert";
   EXPECT_DOUBLE_EQ(JSONParser::ReadNumber<double>(d, d + 7, ',', 2).first,
                    3.14);
   //
@@ -245,9 +247,9 @@ TEST(JsonParserTest, SkipValDouble)
 //---------------------------------------------------------------------------//
 TEST(JsonParserTest, SkipValNegativeInt)
 {
-  char msg[] = "-42|xx";
-  char * v = JSONParser::SkipVal<int>(msg, msg + 5, '|');
-  EXPECT_EQ(v, msg + 3);
+  char msg[] = "-42   |xx";
+  char * v = JSONParser::SkipVal<int>(msg, msg + 8, '|');
+  EXPECT_EQ(v, msg + 6);
   EXPECT_EQ(*v, '|');
 }
 

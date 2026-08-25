@@ -104,7 +104,7 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
     else
     {
       auto [val, after] =
-          JSONParser::ReadNumber<typename[:T:]>(curr, end, Delim);
+          JSONParser::ReadNumber<typename[:T:]>(curr, end, Delim, AddLen);
       assert(*after == Delim);
 
       return {after, val};
@@ -113,12 +113,74 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   std::unreachable();
 }
 
-template <std::meta::info T> char * ParseJson(char * curr)
+template <std::meta::info T> std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
 {
+  using T_ = typename[:T:];
+  T_ out{};
   assert(curr);
   char * start = curr;
+  assert(*curr == '{');
+  constexpr auto flds = GetRelFields<T_>();
+  constexpr auto flds_ord = GetOrderedField<T_>();
+  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();  
+  constexpr auto fieldAnnots = FieldAnnots::MkFldAnnots<T_>();  
+  constexpr auto sz = flds.size();
 
-  return curr;
+  template for(constexpr auto idx : std::views::indices(sz))
+  {
+    curr++;
+    constexpr auto curr_fld = flds[flds_ord[idx]];
+    constexpr auto curr_ann = fieldAnnots[flds_ord[idx]];
+    constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
+    auto name = curr_ann.m_disp_name[0] == '\0'
+      ? ident
+      : curr_ann.m_disp_name.data();
+    
+
+    if constexpr(!strAnnots.m_compressed)
+      SKP_SPC();
+    
+    if constexpr(curr_ann.m_may_absent)
+    {
+      static_assert(IsOption<curr_fld>());
+      if (end - curr < ident.size() + 2)
+        continue;
+      char * old = curr;
+      SKP_IF_STR_G((char const *) ident.begin());
+      // field is absent
+      if (curr == old)
+      {
+        continue;
+        out.[:ident:] = std::nullopt;
+      }
+    }
+    
+    assert(*curr == '"');
+    SKP_STR_SV(name);
+
+    if constexpr(!strAnnots.m_compressed)
+      SKP_SPC();
+ 
+    assert(*curr == ':');
+    curr++;
+
+    if constexpr(!strAnnots.m_compressed)
+      SKP_SPC();
+
+    if constexpr(IsBase<std::meta::type_of(curr_fld)>())
+    {
+      constexpr char Delim = idx == sz - 1 ? '}' : ',';
+      auto [after, v] = ParseBase<std::meta::type_of(curr_fld), 
+           Delim, curr_ann.m_ignore, curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
+      curr = after;
+      out.[:curr_fld:] = v;
+    }
+
+  }
+
+
+
+  return {curr, out};
 }
 
 } // namespace yjson

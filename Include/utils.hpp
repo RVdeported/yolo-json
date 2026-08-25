@@ -117,6 +117,10 @@ struct Ignore
 {
 };
 
+struct MayAbsent
+{
+};
+
 struct DisplayName
 {
   static constexpr std::size_t kMaxLen = 63;
@@ -142,6 +146,7 @@ struct FieldAnnots
   bool m_ignore = false;
   std::array<char, DisplayName::kMaxLen + 1> m_disp_name{};
   int m_min_sz = -1;
+  bool m_may_absent = false;
 
   template <std::meta::info fld> static consteval FieldAnnots MkFieldAnnots()
   {
@@ -159,10 +164,14 @@ struct FieldAnnots
       ann.m_sz = std::meta::extract<Size>(sz[0])._Sz;
     }
 
-    if constexpr (constexpr auto ign = get_annotations<Ignore, fld>();
-                  ign.size() > 0)
+    if constexpr (get_annotations<Ignore, fld>().size() > 0)
     {
       ann.m_ignore = true;
+    }
+
+    if constexpr (get_annotations<MayAbsent, fld>().size() > 0)
+    {
+      ann.m_may_absent = true;
     }
 
     if constexpr (constexpr auto dn = get_annotations<DisplayName, fld>();
