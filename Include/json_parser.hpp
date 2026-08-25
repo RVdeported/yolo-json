@@ -46,14 +46,14 @@
 //---------------------------------------------------------------------------//
 // "SKP_STR_SV": Skip a std::string_view along with its enclosing quotes:    //
 //---------------------------------------------------------------------------//
-#define SKP_STR_SV(Sv)                                                        \
-  {                                                                           \
-    assert(*curr == '"');                                                     \
-    ++curr;                                                                   \
-    assert(std::memcmp(Sv.data(), curr, Sv.size()) == 0);                     \
-    curr += Sv.size();                                                        \
-    assert(*curr == '"');                                                     \
-    ++curr;                                                                   \
+#define SKP_STR_SV(Sv)                                                         \
+  {                                                                            \
+    assert(*curr == '"');                                                      \
+    ++curr;                                                                    \
+    assert(std::memcmp(Sv.data(), curr, Sv.size()) == 0);                      \
+    curr += Sv.size();                                                         \
+    assert(*curr == '"');                                                      \
+    ++curr;                                                                    \
   }
 
 //---------------------------------------------------------------------------//
@@ -61,12 +61,20 @@
 //               if true                                                     //
 //---------------------------------------------------------------------------//
 #define SKP_IF_STR_G(Str)                                                      \
-  (std::strncmp(curr, Str, sizeof(Str) - 1) == 0 &&                            \
-   (curr += sizeof(Str) - 1, true))
+  (std::strncmp(++curr, Str, sizeof(Str) - 1) == 0 &&                          \
+   (curr += sizeof(Str), true))
 
 #define SKP_IF_STR_U(Str) UNLIKELY(SKP_IF_STR_G(Str))
 #define SKP_IF_STR_L(Str) LIKELY(SKP_IF_STR_G(Str))
 #define SKP_IF_STR(Str) SKP_IF_STR_L(Str)
+
+#define SKP_IF_SV_G(Sv)                                                        \
+  (std::memcmp(Sv.data(), ++curr, Sv.size()) == 0 &&                           \
+   (curr += Sv.size() + 1, true))
+
+#define SKP_IF_SV_U(Sv) UNLIKELY(SKP_IF_SV_G(Sv))
+#define SKP_IF_SV_L(Sv) LIKELY(SKP_IF_SV_G(Sv))
+#define SKP_IF_SV(Sv) SKP_IF_SV_L(Sv)
 
 //---------------------------------------------------------------------------//
 // "SKP_SPC": Skip white space:                                              //

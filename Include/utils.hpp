@@ -300,7 +300,8 @@ template <std::meta::info T> consteval bool HasFuncWithName(std::string_view s)
   return std::ranges::contains(funcs, s, std::meta::identifier_of);
 }
 
-template <std::meta::info T> consteval bool IsBase();
+template <std::meta::info T, bool top_lvl = true> consteval bool IsBase();
+template <std::meta::info T> consteval bool IsOption();
 
 template <std::meta::info T> consteval bool IsContainer()
 {
@@ -312,14 +313,6 @@ template <std::meta::info T> consteval bool IsContainer()
   constexpr bool has_push = HasFuncWithName<T>("push");
 
   return !is_base && has_begin && has_end && (has_push_b | has_push);
-}
-
-template <std::meta::info T> consteval bool IsBase()
-{
-  constexpr bool integral = std::meta::is_integral_type(T);
-  constexpr bool floating = std::meta::is_floating_point_type(T);
-  constexpr bool stringal = T == ^^std::string;
-  return integral || floating || stringal;
 }
 
 template <std::meta::info T> consteval bool IsVariant()
@@ -343,6 +336,21 @@ template <std::meta::info T> consteval bool IsOption()
   catch (...)
   {
     return false;
+  }
+}
+
+template <std::meta::info T, bool top_lvl> consteval bool IsBase()
+{
+  if constexpr (IsOption<T>() && top_lvl)
+  {
+    return IsBase<std::meta::template_arguments_of(T)[0], false>();
+  }
+  else
+  {
+    constexpr bool integral = std::meta::is_integral_type(T);
+    constexpr bool floating = std::meta::is_floating_point_type(T);
+    constexpr bool stringal = T == ^^std::string;
+    return integral || floating || stringal;
   }
 }
 } // namespace yjson

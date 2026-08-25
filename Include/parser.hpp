@@ -113,7 +113,8 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   std::unreachable();
 }
 
-template <std::meta::info T> std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
+template <std::meta::info T>
+std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
 {
   using T_ = typename[:T:];
   T_ out{};
@@ -122,34 +123,30 @@ template <std::meta::info T> std::pair<char *, typename[:T:]> ParseJson(char * c
   assert(*curr == '{');
   constexpr auto flds = GetRelFields<T_>();
   constexpr auto flds_ord = GetOrderedField<T_>();
-  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();  
-  constexpr auto fieldAnnots = FieldAnnots::MkFldAnnots<T_>();  
+  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
+  constexpr auto fieldAnnots = FieldAnnots::MkFldAnnots<T_>();
   constexpr auto sz = flds.size();
 
-  template for(constexpr auto idx : std::views::indices(sz))
+  template for (constexpr auto idx : std::views::indices(sz))
   {
     curr++;
     constexpr auto curr_fld = flds[flds_ord[idx]];
     constexpr auto curr_ann = fieldAnnots[flds_ord[idx]];
     constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
-    constexpr auto name = curr_ann.m_disp_name[0] == '\0'
-      ? ident
-      : curr_ann.m_disp_name.data();
-    
-    constexpr auto NameSz = name.size();
-    char name_c[NameSz]{[:name:]};
-    // std::cout << sizeof((char[NameSz]) (char*) name.begin()) << '\n';
+    constexpr auto name =
+        curr_ann.m_disp_name[0] == '\0' ? ident : curr_ann.m_disp_name.data();
 
-    if constexpr(!strAnnots.m_compressed)
+    if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
-    
-    if constexpr(curr_ann.m_may_absent)
+
+    std::cout << curr << '\n';
+    if constexpr (curr_ann.m_may_absent)
     {
       static_assert(IsOption<std::meta::type_of(curr_fld)>());
-      if (end - curr < ident.size() + 2)
+      if (end - curr < name.size() + 2)
         continue;
       char * old = curr;
-      SKP_IF_STR_G((char const *) name.begin());
+      SKP_IF_SV_G(name);
       // field is absent
       if (curr == old)
       {
@@ -164,28 +161,30 @@ template <std::meta::info T> std::pair<char *, typename[:T:]> ParseJson(char * c
       assert(*curr == '"');
       SKP_STR_SV(name);
     }
-    if constexpr(!strAnnots.m_compressed)
+    if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
- 
+
     assert(*curr == ':');
     curr++;
 
-    if constexpr(!strAnnots.m_compressed)
+    if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
 
-    if constexpr(IsBase<std::meta::type_of(curr_fld)>())
+    if constexpr (IsBase<std::meta::type_of(curr_fld)>())
     {
+      constexpr auto t = std::meta::type_of(curr_fld);
+      constexpr auto base_cls = std::meta::has_template_arguments(t)
+                                    ? std::meta::template_arguments_of(t)[0]
+                                    : t;
+
       constexpr char Delim = idx == sz - 1 ? '}' : ',';
-      auto [after, v] = ParseBase<std::meta::type_of(curr_fld), 
-           Delim, curr_ann.m_ignore, curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
+      auto [after, v] = ParseBase<base_cls, Delim, curr_ann.m_ignore,
+                                  curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
       curr = after;
       out.[:curr_fld:] = v;
-      std::cout << v << '\n';
+      // std::cout << v << '\n';
     }
-
   }
-
-
 
   return {curr, out};
 }
