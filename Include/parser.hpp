@@ -132,32 +132,38 @@ template <std::meta::info T> std::pair<char *, typename[:T:]> ParseJson(char * c
     constexpr auto curr_fld = flds[flds_ord[idx]];
     constexpr auto curr_ann = fieldAnnots[flds_ord[idx]];
     constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
-    auto name = curr_ann.m_disp_name[0] == '\0'
+    constexpr auto name = curr_ann.m_disp_name[0] == '\0'
       ? ident
       : curr_ann.m_disp_name.data();
     
+    constexpr auto NameSz = name.size();
+    char name_c[NameSz]{[:name:]};
+    // std::cout << sizeof((char[NameSz]) (char*) name.begin()) << '\n';
 
     if constexpr(!strAnnots.m_compressed)
       SKP_SPC();
     
     if constexpr(curr_ann.m_may_absent)
     {
-      static_assert(IsOption<curr_fld>());
+      static_assert(IsOption<std::meta::type_of(curr_fld)>());
       if (end - curr < ident.size() + 2)
         continue;
       char * old = curr;
-      SKP_IF_STR_G((char const *) ident.begin());
+      SKP_IF_STR_G((char const *) name.begin());
       // field is absent
       if (curr == old)
       {
+        std::cout << "skipping\n";
+        out.[:curr_fld:] = std::nullopt;
+        curr--;
         continue;
-        out.[:ident:] = std::nullopt;
       }
     }
-    
-    assert(*curr == '"');
-    SKP_STR_SV(name);
-
+    else
+    {
+      assert(*curr == '"');
+      SKP_STR_SV(name);
+    }
     if constexpr(!strAnnots.m_compressed)
       SKP_SPC();
  
@@ -174,6 +180,7 @@ template <std::meta::info T> std::pair<char *, typename[:T:]> ParseJson(char * c
            Delim, curr_ann.m_ignore, curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
       curr = after;
       out.[:curr_fld:] = v;
+      std::cout << v << '\n';
     }
 
   }
