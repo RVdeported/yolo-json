@@ -87,6 +87,9 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
 {
   static_assert(IsBase<T>());
   constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
+  constexpr bool integral = std::meta::is_integral_type(T);
+  constexpr bool floating = std::meta::is_floating_point_type(T);
+
   if constexpr (Ignore)
   {
     char * after = JSONParser::SkipVal<typename[:T:]>(curr, end, Delim, AddLen);
@@ -95,19 +98,20 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   }
   else
   {
-    if constexpr (T == ^^std::string)
-    {
-      GET_STR(Out);
-      assert(*curr == Delim);
-      return {curr, typename[:T:](Out)};
-    }
-    else
+    if constexpr (integral || floating)
     {
       auto [val, after] =
           JSONParser::ReadNumber<typename[:T:]>(curr, end, Delim, AddLen);
       assert(*after == Delim);
 
       return {after, val};
+    }
+    else
+    {
+      std::cout << "--" << curr << '\n';
+      GET_STR(Out);
+      assert(*curr == Delim);
+      return {curr, typename[:T:](Out)};
     }
   }
   std::unreachable();
@@ -135,11 +139,16 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
     constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
     constexpr auto name =
         curr_ann.m_disp_name[0] == '\0' ? ident : curr_ann.m_disp_name.data();
+    constexpr auto t = std::meta::type_of(curr_fld);
+    constexpr auto base_cls = std::meta::has_template_arguments(t)
+                                  ? std::meta::template_arguments_of(t)[0]
+                                  : t;
 
     if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
 
     std::cout << curr << '\n';
+    std::cout << std::meta::display_string_of(t) << '\n';
     if constexpr (curr_ann.m_may_absent)
     {
       static_assert(IsOption<std::meta::type_of(curr_fld)>());
@@ -170,22 +179,36 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
     if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
 
-    if constexpr (IsBase<std::meta::type_of(curr_fld)>())
+    if constexpr (IsBase<t>())
     {
-      constexpr auto t = std::meta::type_of(curr_fld);
-      constexpr auto base_cls = std::meta::has_template_arguments(t)
-                                    ? std::meta::template_arguments_of(t)[0]
-                                    : t;
-
       constexpr char Delim = idx == sz - 1 ? '}' : ',';
-      auto [after, v] = ParseBase<base_cls, Delim, curr_ann.m_ignore,
-                                  curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
+      auto [after, v] =
+          ParseBase<base_cls == ^^char ? t : base_cls, Delim, curr_ann.m_ignore,
+                    curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
       curr = after;
       out.[:curr_fld:] = v;
       // std::cout << v << '\n';
     }
+    else if constexpr (IsContainer<t>())
+    {
+      // not implemented
+      static_assert(false);
+    }
+    // should be aonother object then
+    else
+    {
+      assert(*curr == '{');
+      auto [after, v] = ParseJson<base_cls>();
+      curr = after;
+      out.[:curr_fld:] = v;
+    }
   }
-
+  if constexpr (!strAnnots.m_compressed)
+    SKP_SPC();
+  assert(*curr == '}');
+  curr++;
+  if constexpr (!strAnnots.m_compressed)
+    SKP_SPC();
   return {curr, out};
 }
 

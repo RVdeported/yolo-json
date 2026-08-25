@@ -21,7 +21,7 @@ struct B
 
 struct[[= yjson::NotCompressed{}]] A
 {
-  [[= yjson::Position{10}, = yjson::MayAbsent{}]] std::optional<int> a = 5;
+  [[ = yjson::Position{10}, = yjson::MayAbsent{} ]] std::optional<int> a = 5;
   [[= yjson::Position{0}]] int c = 9;
   std::string ss = "temp";
 };
@@ -108,10 +108,12 @@ template <typename T> void print_(T & A, std::ostream & stream)
 int main()
 {
   static_assert(yjson::IsOption<^^std::optional<int>>());
+  static_assert(yjson::IsBase<^^std::string>());
   std::string test = "{  \"c\"  :  34 , \"a\"  : 31       ,  \"ss\":\"test\"}";
-    
-  auto [rest, a] = yjson::ParseJson<^^A>(test.data(), test.data() + test.size());
-  
+
+  auto [rest, a] =
+      yjson::ParseJson<^^A>(test.data(), test.data() + test.size());
+
   std::cout << a.c << "|" << a.a.value_or(0) << "|" << a.ss << '\n';
   // static_assert(have[1] == -1);
   // template for (constexpr auto v : ss)

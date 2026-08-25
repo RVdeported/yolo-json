@@ -350,7 +350,8 @@ template <std::meta::info T, bool top_lvl> consteval bool IsBase()
     constexpr bool integral = std::meta::is_integral_type(T);
     constexpr bool floating = std::meta::is_floating_point_type(T);
     constexpr bool stringal = T == ^^std::string;
-    return integral || floating || stringal;
+    constexpr bool string11 = T == ^^std::__cxx11::basic_string<char>;
+    return integral || floating || stringal || string11;
   }
 }
 } // namespace yjson
