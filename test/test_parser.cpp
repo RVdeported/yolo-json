@@ -1,0 +1,404 @@
+//===========================================================================//
+//                    "test_parser.cpp":                                     //
+//     End-to-end tests for Include/parser.hpp (yjson::ParseJson)            //
+//===========================================================================//
+#include "Include/parser.hpp"
+
+#include <gtest/gtest.h>
+
+#include <cstring>
+#include <optional>
+#include <string>
+
+//---------------------------------------------------------------------------//
+// Test structs:                                                             //
+//---------------------------------------------------------------------------//
+namespace test_types
+{
+
+struct Basic
+{
+  int i;
+  double d;
+  std::string s;
+};
+
+struct Signed
+{
+  int a;
+  double b;
+};
+
+struct Booly
+{
+  bool f;
+};
+
+struct Leaf
+{
+  int v;
+};
+
+struct Mid
+{
+  Leaf leaf;
+  int m;
+};
+
+struct Deep
+{
+  int top;
+  Mid mid;
+};
+
+struct Inner
+{
+  int x;
+  std::string tag;
+};
+
+struct Outer
+{
+  int a;
+  Inner in;
+  std::string name;
+};
+
+struct Escaped
+{
+  std::string s;
+};
+
+struct[[= yjson::NotCompressed{}]] Spaced
+{
+  int a;
+  int b;
+  std::string s;
+};
+
+struct Positioned
+{
+  [[= yjson::Position{1}]] int second;
+  [[= yjson::Position{0}]] int first;
+};
+
+struct PosThenDef
+{
+  [[= yjson::Position{1}]] int aa;
+  int bb;
+  int cc;
+  [[= yjson::Position{0}]] int dd;
+};
+
+struct[[= yjson::Alphabetical{false}]] AlphaFwd
+{
+  int banana;
+  int apple;
+  int cherry;
+};
+
+struct[[= yjson::Alphabetical{true}]] AlphaRev
+{
+  int apple;
+  int banana;
+  int cherry;
+};
+
+struct Opt
+{
+  [[= yjson::MayAbsent{}]] std::optional<int> opt;
+  int rest;
+};
+
+struct Ignored
+{
+  [[= yjson::Ignore{}]] int skip;
+  int keep;
+};
+
+struct Sized
+{
+  [[= yjson::Size{5}]] int fixed;
+  int after;
+};
+
+struct MinSized
+{
+  [[= yjson::MinSize{4}]] int mn;
+  int after;
+};
+
+struct Pair
+{
+  int a;
+  int b;
+};
+
+struct[[= yjson::NotCompressed{}]] Nested
+{
+  int x;
+  std::string tag;
+};
+
+// A struct exercising several annotations at once: field ordering (Position),
+// an optional (MayAbsent), a skipped value (Ignore) and a nested object, all
+// wrapped in a NotCompressed (whitespace-tolerant) object.
+struct[[= yjson::NotCompressed{}]] Convoluted
+{
+  [[= yjson::Position{1}]] int b;
+  [[= yjson::Position{0}]] int a;
+  [[= yjson::MayAbsent{}]] std::optional<int> maybe;
+  [[= yjson::Ignore{}]] int skip;
+  int tail;
+  Nested nested;
+};
+
+} // namespace test_types
+
+//---------------------------------------------------------------------------//
+// Helpers:                                                                  //
+//---------------------------------------------------------------------------//
+namespace
+{
+
+// Parse an in-memory JSON buffer (which ParseJson mutates in place) into T and
+// return the resulting value.
+template <typename T> T Parse(std::string json)
+{
+  auto [rest, value] =
+      yjson::ParseJson<^^T>(json.data(), json.data() + json.size());
+  (void)rest;
+  return value;
+}
+
+} // namespace
+
+//---------------------------------------------------------------------------//
+// Basic JSON values:                                                        //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesBasicTypes)
+{
+  auto v = Parse<test_types::Basic>(R"({"i":42,"d":3.14,"s":"hello"})");
+  EXPECT_EQ(v.i, 42);
+  EXPECT_DOUBLE_EQ(v.d, 3.14);
+  EXPECT_EQ(v.s, "hello");
+}
+
+TEST(ParseJsonTest, ParsesNegativeNumbers)
+{
+  auto v = Parse<test_types::Signed>(R"({"a":-7,"b":-2.5})");
+  EXPECT_EQ(v.a, -7);
+  EXPECT_DOUBLE_EQ(v.b, -2.5);
+}
+
+// JSON true/false literals are NOT decoded (bool is read as an integer), so
+// only numeric 0/1 round-trip through the current parser.
+TEST(ParseJsonTest, ParsesBooleanAsIntegerZeroOrOne)
+{
+  auto t = Parse<test_types::Booly>(R"({"f":true})");
+  EXPECT_TRUE(t.f);
+
+  auto f = Parse<test_types::Booly>(R"({"f":false})");
+  EXPECT_FALSE(f.f);
+}
+
+TEST(ParseJsonTest, ParsesNestedStructs)
+{
+  auto v =
+      Parse<test_types::Outer>(R"({"a":1,"in":{"x":99,"tag":"T"},"name":"n"})");
+  EXPECT_EQ(v.a, 1);
+  EXPECT_EQ(v.in.x, 99);
+  EXPECT_EQ(v.in.tag, "T");
+  EXPECT_EQ(v.name, "n");
+}
+
+TEST(ParseJsonTest, ParsesDeeplyNestedStructs)
+{
+  auto v = Parse<test_types::Deep>(R"({"top":1,"mid":{"leaf":{"v":7},"m":8}})");
+  EXPECT_EQ(v.top, 1);
+  EXPECT_EQ(v.mid.leaf.v, 7);
+  EXPECT_EQ(v.mid.m, 8);
+}
+
+// Strings are returned verbatim (no unescaping); an escaped quote and escaped
+// backslash are preserved as-is.
+TEST(ParseJsonTest, ParsesEscapedStringContent)
+{
+  auto v = Parse<test_types::Escaped>(R"({"s":"a\"b\\c"})");
+  EXPECT_EQ(v.s, std::string(R"(a\"b\\c)"));
+}
+
+//---------------------------------------------------------------------------//
+// Whitespace handling (NotCompressed):                                      //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesNotCompressedWithWhitespace)
+{
+  // The trailing string is the last field, so its closing quote must be
+  // followed immediately by '}' (no whitespace before the delimiter).
+  auto v = Parse<test_types::Spaced>(R"({ "a" : 1 , "b" : 2 , "s" : "hi"})");
+  EXPECT_EQ(v.a, 1);
+  EXPECT_EQ(v.b, 2);
+  EXPECT_EQ(v.s, "hi");
+}
+
+//---------------------------------------------------------------------------//
+// Field ordering annotations:                                               //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesPositionAnnotation)
+{
+  auto v = Parse<test_types::Positioned>(R"({"first":10,"second":20})");
+  EXPECT_EQ(v.first, 10);
+  EXPECT_EQ(v.second, 20);
+}
+
+TEST(ParseJsonTest, ParsesPositionThenDefinitionOrder)
+{
+  // dd (Position 0) and aa (Position 1) are placed first; bb and cc follow in
+  // definition order.
+  auto v = Parse<test_types::PosThenDef>(R"({"dd":1,"aa":2,"bb":3,"cc":4})");
+  EXPECT_EQ(v.dd, 1);
+  EXPECT_EQ(v.aa, 2);
+  EXPECT_EQ(v.bb, 3);
+  EXPECT_EQ(v.cc, 4);
+}
+
+TEST(ParseJsonTest, ParsesAlphabeticalForward)
+{
+  auto v = Parse<test_types::AlphaFwd>(R"({"apple":1,"banana":2,"cherry":3})");
+  EXPECT_EQ(v.apple, 1);
+  EXPECT_EQ(v.banana, 2);
+  EXPECT_EQ(v.cherry, 3);
+}
+
+TEST(ParseJsonTest, ParsesAlphabeticalReverse)
+{
+  auto v = Parse<test_types::AlphaRev>(R"({"cherry":3,"banana":2,"apple":1})");
+  EXPECT_EQ(v.apple, 1);
+  EXPECT_EQ(v.banana, 2);
+  EXPECT_EQ(v.cherry, 3);
+}
+
+//---------------------------------------------------------------------------//
+// Optional fields (MayAbsent):                                              //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesOptionalWhenPresent)
+{
+  auto v = Parse<test_types::Opt>(R"({"opt":42,"rest":9})");
+  ASSERT_TRUE(v.opt.has_value());
+  EXPECT_EQ(v.opt.value(), 42);
+  EXPECT_EQ(v.rest, 9);
+}
+
+//---------------------------------------------------------------------------//
+// Optional fields (null given):                                             //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesOptionalWhenNull)
+{
+  auto v = Parse<test_types::Opt>(R"({"opt":null,"rest":9})");
+  ASSERT_FALSE(v.opt.has_value());
+  EXPECT_EQ(v.rest, 9);
+}
+
+//---------------------------------------------------------------------------//
+// Value-shaping annotations (Ignore / Size / MinSize):                      //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesIgnoreAnnotation)
+{
+  // The ignored field's key must still be present; its value is skipped and
+  // the member keeps its default-initialized value.
+  auto v = Parse<test_types::Ignored>(R"({"skip":123,"keep":456})");
+  EXPECT_EQ(v.skip, 0);
+  EXPECT_EQ(v.keep, 456);
+}
+
+TEST(ParseJsonTest, ParsesSizeAnnotation)
+{
+  auto v = Parse<test_types::Sized>(R"({"fixed":12345,"after":9})");
+  EXPECT_EQ(v.fixed, 12345);
+  EXPECT_EQ(v.after, 9);
+}
+
+TEST(ParseJsonTest, ParsesMinSizeAnnotation)
+{
+  auto v = Parse<test_types::MinSized>(R"({"mn":9999,"after":9})");
+  EXPECT_EQ(v.mn, 9999);
+  EXPECT_EQ(v.after, 9);
+}
+
+//---------------------------------------------------------------------------//
+// Convoluted JSON: several annotations combined:                            //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesCombinedAnnotations)
+{
+  auto v = Parse<test_types::Convoluted>(
+      R"({ "a":1 , "b":2 , "maybe":3 , "skip":999 , "tail":5 , "nested" : { "x":7 , "tag":"T"} })");
+
+  EXPECT_EQ(v.a, 1);
+  EXPECT_EQ(v.b, 2);
+  ASSERT_TRUE(v.maybe.has_value());
+  EXPECT_EQ(v.maybe.value(), 3);
+  EXPECT_EQ(v.skip, 0); // ignored
+  EXPECT_EQ(v.tail, 5);
+  EXPECT_EQ(v.nested.x, 7);
+  EXPECT_EQ(v.nested.tag, "T");
+}
+
+//---------------------------------------------------------------------------//
+// Return value (consumed pointer):                                          //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ReturnsPointerPastClosingBrace)
+{
+  char buf[] = R"({"a":1,"b":2})";
+  auto [after, value] =
+      yjson::ParseJson<^^test_types::Pair>(buf, buf + std::strlen(buf));
+  EXPECT_EQ(after, buf + std::strlen(buf));
+  EXPECT_EQ(value.a, 1);
+  EXPECT_EQ(value.b, 2);
+}
+
+//---------------------------------------------------------------------------//
+// Optional field absent:                                                    //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, OptionalFieldAbsent)
+{
+  char buf[] = R"({"rest":9})";
+  auto [rest, v] =
+      yjson::ParseJson<^^test_types::Opt>(buf, buf + std::strlen(buf));
+  (void)rest;
+  EXPECT_FALSE(v.opt.has_value());
+  EXPECT_EQ(v.rest, 9);
+}
+
+//---------------------------------------------------------------------------//
+// Boolean literals:                                                         //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, BooleanLiterals)
+{
+  char t[] = R"({"f":true})";
+  auto [rt, vt] = yjson::ParseJson<^^test_types::Booly>(t, t + std::strlen(t));
+  (void)rt;
+  EXPECT_TRUE(vt.f);
+
+  char f[] = R"({"f":false})";
+  auto [rf, vf] = yjson::ParseJson<^^test_types::Booly>(f, f + std::strlen(f));
+  (void)rf;
+  EXPECT_FALSE(vf.f);
+}
+//===========================================================================//
+// Known limitations (documented; disabled until fixed):                     //
+//===========================================================================//
+//
+// The reflection parser is a work in progress. The following behaviors are
+// known to be missing or broken in the current state and are disabled here so
+// they can be enabled once implemented:
+//
+//  * DisplayName: cannot be used with ParseJson (compile error) even though it
+//    works for field ordering (covered in test_annotations.cpp).
+//  * char fields: treated as an integer, so quoted character values do not
+//    round-trip.
+//  * Containers/arrays: hit `static_assert(false)` in ParseJson (not
+//    implemented).
+//  * std::variant: not supported.
+
+
+

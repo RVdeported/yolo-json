@@ -134,7 +134,7 @@ TEST(JsonParserTest, FindValSearchesFromHint)
 //---------------------------------------------------------------------------//
 TEST(JsonParserTest, StringScanMacros)
 {
-  char buf[] = "foobar";
+  char buf[] = "\"foo\"bar";
   char * curr = buf;
 
   EXPECT_TRUE(SKP_IF_STR("foo"));
@@ -144,7 +144,7 @@ TEST(JsonParserTest, StringScanMacros)
   EXPECT_STREQ(curr, "bar");
 
   SKP_STR("bar");
-  EXPECT_EQ(curr, buf + 6);
+  EXPECT_EQ(curr, buf + 8);
 
   const char * m = "hello world";
   const char * p = m;

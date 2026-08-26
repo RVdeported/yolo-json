@@ -108,7 +108,6 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
     }
     else
     {
-      std::cout << "--" << curr << '\n';
       GET_STR(Out);
       assert(*curr == Delim);
       return {curr, typename[:T:](Out)};
@@ -116,7 +115,6 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   }
   std::unreachable();
 }
-
 template <std::meta::info T>
 std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
 {
@@ -143,12 +141,11 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
     constexpr auto base_cls = std::meta::has_template_arguments(t)
                                   ? std::meta::template_arguments_of(t)[0]
                                   : t;
-
+    
+    std::cout << curr << '\n';
     if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
 
-    std::cout << curr << '\n';
-    std::cout << std::meta::display_string_of(t) << '\n';
     if constexpr (curr_ann.m_may_absent)
     {
       static_assert(IsOption<std::meta::type_of(curr_fld)>());
@@ -156,10 +153,10 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
         continue;
       char * old = curr;
       SKP_IF_SV_G(name);
+      std::cout << curr << '\n';
       // field is absent
       if (curr == old)
       {
-        std::cout << "skipping\n";
         out.[:curr_fld:] = std::nullopt;
         curr--;
         continue;
@@ -167,6 +164,9 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
     }
     else
     {
+      if constexpr (!strAnnots.m_compressed)
+        SKP_SPC();
+
       assert(*curr == '"');
       SKP_STR_SV(name);
     }
@@ -178,7 +178,35 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
 
     if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
+  
+    if constexpr (IsOption<t>())
+    {
+      if (*curr == 'n')
+      {
+        SKP_STR("null") 
+        out.[:curr_fld:] = std::nullopt;
+        if constexpr (!strAnnots.m_compressed)
+          SKP_SPC();
+        continue;
+      }
+    }
 
+    if constexpr (IsBool(base_cls))
+    {
+      if (*curr == 't')
+      {
+        SKP_STR("true")
+        out.[:curr_fld:] = true; 
+      }
+      else
+      {
+        SKP_STR("false")
+        out.[:curr_fld:] = false; 
+      }
+      if constexpr (!strAnnots.m_compressed)
+        SKP_SPC();
+    }
+    else
     if constexpr (IsBase<t>())
     {
       constexpr char Delim = idx == sz - 1 ? '}' : ',';
@@ -187,7 +215,6 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
                     curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
       curr = after;
       out.[:curr_fld:] = v;
-      // std::cout << v << '\n';
     }
     else if constexpr (IsContainer<t>())
     {
@@ -198,9 +225,16 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char const * end)
     else
     {
       assert(*curr == '{');
-      auto [after, v] = ParseJson<base_cls>();
-      curr = after;
-      out.[:curr_fld:] = v;
+      if constexpr(curr_ann.m_ignore && curr_ann.m_sz > 0)
+      {
+        curr += curr_ann.m_sz;
+      }
+      else
+      {
+        auto [after, v] = ParseJson<base_cls>(curr, end);
+        curr = after;
+        out.[:curr_fld:] = v;
+      }
     }
   }
   if constexpr (!strAnnots.m_compressed)

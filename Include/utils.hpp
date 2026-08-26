@@ -339,6 +339,11 @@ template <std::meta::info T> consteval bool IsOption()
   }
 }
 
+consteval bool IsBool(std::meta::info T)
+{
+  return T == ^^bool;
+}
+
 template <std::meta::info T, bool top_lvl> consteval bool IsBase()
 {
   if constexpr (IsOption<T>() && top_lvl)
@@ -349,9 +354,13 @@ template <std::meta::info T, bool top_lvl> consteval bool IsBase()
   {
     constexpr bool integral = std::meta::is_integral_type(T);
     constexpr bool floating = std::meta::is_floating_point_type(T);
+    constexpr bool boolean  = IsBool(T);
     constexpr bool stringal = T == ^^std::string;
     constexpr bool string11 = T == ^^std::__cxx11::basic_string<char>;
-    return integral || floating || stringal || string11;
+    return integral || floating || stringal || string11 || boolean;
   }
 }
+
+
+
 } // namespace yjson

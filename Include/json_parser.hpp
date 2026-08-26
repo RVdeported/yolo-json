@@ -49,9 +49,9 @@
 #define SKP_STR_SV(Sv)                                                         \
   {                                                                            \
     assert(*curr == '"');                                                      \
-    ++curr;                                                                    \
-    assert(std::memcmp(Sv.data(), curr, Sv.size()) == 0);                      \
-    curr += Sv.size();                                                         \
+    curr;                                                                      \
+    assert(std::memcmp(Sv.data(), curr + 1, Sv.size()) == 0);                  \
+    curr += Sv.size() + 1;                                                     \
     assert(*curr == '"');                                                      \
     ++curr;                                                                    \
   }
@@ -61,16 +61,16 @@
 //               if true                                                     //
 //---------------------------------------------------------------------------//
 #define SKP_IF_STR_G(Str)                                                      \
-  (std::strncmp(++curr, Str, sizeof(Str) - 1) == 0 &&                          \
-   (curr += sizeof(Str), true))
+  (std::strncmp(curr + 1, Str, sizeof(Str) - 1) == 0 &&                          \
+   (curr += sizeof(Str) + 1, true))
 
 #define SKP_IF_STR_U(Str) UNLIKELY(SKP_IF_STR_G(Str))
 #define SKP_IF_STR_L(Str) LIKELY(SKP_IF_STR_G(Str))
 #define SKP_IF_STR(Str) SKP_IF_STR_L(Str)
 
 #define SKP_IF_SV_G(Sv)                                                        \
-  (std::memcmp(Sv.data(), ++curr, Sv.size()) == 0 &&                           \
-   (curr += Sv.size() + 1, true))
+  (std::memcmp(Sv.data(), curr + 1, Sv.size()) == 0 &&                           \
+   (curr += Sv.size() + 2, true))
 
 #define SKP_IF_SV_U(Sv) UNLIKELY(SKP_IF_SV_G(Sv))
 #define SKP_IF_SV_L(Sv) LIKELY(SKP_IF_SV_G(Sv))
