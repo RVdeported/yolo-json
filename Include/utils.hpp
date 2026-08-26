@@ -344,6 +344,19 @@ consteval bool IsBool(std::meta::info T)
   return T == ^^bool;
 }
 
+consteval bool IsTuple(std::meta::info T)
+{
+  try
+  {
+    return std::meta::template_of(T) == ^^std::tuple
+        || std::meta::template_of(T) == ^^std::pair;
+  }
+  catch(...)
+  {
+    return false;
+  }
+}
+
 template <std::meta::info T, bool top_lvl> consteval bool IsBase()
 {
   if constexpr (IsOption<T>() && top_lvl)

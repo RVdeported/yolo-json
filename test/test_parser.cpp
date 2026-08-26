@@ -76,6 +76,14 @@ struct[[= yjson::NotCompressed{}]] Spaced
   std::string s;
 };
 
+struct[[= yjson::NotCompressed{}]] StrMiddle
+{
+
+  int a;
+  std::string b;
+  int c;
+};
+
 struct Positioned
 {
   [[= yjson::Position{1}]] int second;
@@ -151,6 +159,21 @@ struct[[= yjson::NotCompressed{}]] Convoluted
   [[= yjson::Ignore{}]] int skip;
   int tail;
   Nested nested;
+};
+
+// DisplayName overrides the JSON key used to read a field.
+struct DisplayNamed
+{
+  [[= yjson::DisplayName{"renamed"}]] int original;
+  int normal;
+};
+
+// DisplayName combined with MayAbsent on an optional field.
+struct DisplayNamedOpt
+{
+  [[ = yjson::MayAbsent{}, = yjson::DisplayName{"val"} ]] std::optional<int>
+      opt;
+  int rest;
 };
 
 } // namespace test_types
@@ -344,6 +367,31 @@ TEST(ParseJsonTest, ParsesCombinedAnnotations)
 }
 
 //---------------------------------------------------------------------------//
+// DisplayName annotation:                                                   //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesDisplayNameAnnotation)
+{
+  auto v = Parse<test_types::DisplayNamed>(R"({"renamed":42,"normal":7})");
+  EXPECT_EQ(v.original, 42);
+  EXPECT_EQ(v.normal, 7);
+}
+
+TEST(ParseJsonTest, ParsesDisplayNameOptionalWhenPresent)
+{
+  auto v = Parse<test_types::DisplayNamedOpt>(R"({"val":11,"rest":5})");
+  ASSERT_TRUE(v.opt.has_value());
+  EXPECT_EQ(v.opt.value(), 11);
+  EXPECT_EQ(v.rest, 5);
+}
+
+TEST(ParseJsonTest, ParsesDisplayNameOptionalWhenAbsent)
+{
+  auto v = Parse<test_types::DisplayNamedOpt>(R"({"rest":5})");
+  EXPECT_FALSE(v.opt.has_value());
+  EXPECT_EQ(v.rest, 5);
+}
+
+//---------------------------------------------------------------------------//
 // Return value (consumed pointer):                                          //
 //---------------------------------------------------------------------------//
 TEST(ParseJsonTest, ReturnsPointerPastClosingBrace)
@@ -384,6 +432,20 @@ TEST(ParseJsonTest, BooleanLiterals)
   (void)rf;
   EXPECT_FALSE(vf.f);
 }
+
+//---------------------------------------------------------------------------//
+// Optional field absent:                                                    //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, StringInMiddle)
+{
+  char buf[] = R"({"a":3,  "b" : "333"  ,   "c": 56})";
+  auto [rest, v] =
+      yjson::ParseJson<^^test_types::StrMiddle>(buf, buf + std::strlen(buf));
+  (void)rest;
+  EXPECT_EQ(v.a, 3);
+  EXPECT_EQ(v.b, "333");
+  EXPECT_EQ(v.c, 56);
+}
 //===========================================================================//
 // Known limitations (documented; disabled until fixed):                     //
 //===========================================================================//
@@ -392,13 +454,8 @@ TEST(ParseJsonTest, BooleanLiterals)
 // known to be missing or broken in the current state and are disabled here so
 // they can be enabled once implemented:
 //
-//  * DisplayName: cannot be used with ParseJson (compile error) even though it
-//    works for field ordering (covered in test_annotations.cpp).
 //  * char fields: treated as an integer, so quoted character values do not
 //    round-trip.
 //  * Containers/arrays: hit `static_assert(false)` in ParseJson (not
 //    implemented).
 //  * std::variant: not supported.
-
-
-
