@@ -9,6 +9,8 @@
 #include <cstring>
 #include <optional>
 #include <string>
+#include <tuple>
+#include <utility>
 
 //---------------------------------------------------------------------------//
 // Test structs:                                                             //
@@ -174,6 +176,87 @@ struct DisplayNamedOpt
   [[ = yjson::MayAbsent{}, = yjson::DisplayName{"val"} ]] std::optional<int>
       opt;
   int rest;
+};
+
+//---------------------------------------------------------------------------//
+// Tuples (std::tuple / std::pair):                                          //
+//---------------------------------------------------------------------------//
+
+// A plain tuple field (no annotations).
+struct TupleBasic
+{
+  std::tuple<int, int> t;
+};
+
+// A tuple with mixed element types.
+struct TupleMixed
+{
+  std::tuple<int, double, std::string, bool> t;
+};
+
+// A std::pair field (parsed like a two-element tuple).
+struct TuplePair
+{
+  std::pair<int, std::string> p;
+};
+
+// A nested tuple (a tuple containing another tuple).
+struct TupleNested
+{
+  std::tuple<std::tuple<int, int>, int> t;
+};
+
+// A tuple containing a nested object.
+struct TupleOfObjs
+{
+  std::tuple<Leaf, int> t;
+};
+
+// A tuple element that is itself optional (may be null).
+struct TupleOfOptional
+{
+  std::tuple<std::optional<int>, int> t;
+};
+
+// A tuple field ordered via Position.
+struct TuplePositioned
+{
+  [[= yjson::Position{1}]] int a;
+  [[= yjson::Position{0}]] std::tuple<int, int> t;
+};
+
+// A tuple field whose JSON key is renamed via DisplayName.
+struct TupleDisplayName
+{
+  [[= yjson::DisplayName{"vec"}]] std::tuple<int, int> t;
+  int rest;
+};
+
+// A tuple inside an Alphabetical struct (fields sorted by identifier).
+struct[[= yjson::Alphabetical{false}]] TupleAlpha
+{
+  int banana;
+  std::tuple<int, int> apple;
+  int cherry;
+};
+
+// A tuple inside a NotCompressed (whitespace-tolerant) struct.
+struct[[= yjson::NotCompressed{}]] TupleSpaced
+{
+  std::tuple<int, int> t;
+  int x;
+};
+
+// Several annotations combined with tuples: Position-ordered tuple fields, an
+// optional (MayAbsent), a DisplayName override on a pair, and a nested tuple,
+// all wrapped in a NotCompressed object.
+struct[[= yjson::NotCompressed{}]] TupleConvoluted
+{
+  [[= yjson::Position{1}]] int b;
+  [[= yjson::Position{0}]] std::tuple<int, int> t;
+  [[= yjson::MayAbsent{}]] std::optional<int> maybe;
+  [[= yjson::DisplayName{"pair"}]] std::pair<int, std::string> p;
+  std::tuple<std::tuple<int, int>, int> nested;
 };
 
 } // namespace test_types
@@ -446,6 +529,114 @@ TEST(ParseJsonTest, StringInMiddle)
   EXPECT_EQ(v.b, "333");
   EXPECT_EQ(v.c, 56);
 }
+
+//---------------------------------------------------------------------------//
+// Tuples (std::tuple / std::pair):                                          //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesTupleField)
+{
+  auto v = Parse<test_types::TupleBasic>(R"({"t":[1,2]})");
+  EXPECT_EQ(v.t, (std::tuple<int, int>{1, 2}));
+}
+
+TEST(ParseJsonTest, ParsesTupleMixedTypes)
+{
+  auto v = Parse<test_types::TupleMixed>(R"({"t":[1,2.5,"hi",true]})");
+  EXPECT_EQ(std::get<0>(v.t), 1);
+  EXPECT_DOUBLE_EQ(std::get<1>(v.t), 2.5);
+  EXPECT_EQ(std::get<2>(v.t), "hi");
+  EXPECT_TRUE(std::get<3>(v.t));
+}
+
+TEST(ParseJsonTest, ParsesPairField)
+{
+  auto v = Parse<test_types::TuplePair>(R"({"p":[7,"hi"]})");
+  EXPECT_EQ(v.p.first, 7);
+  EXPECT_EQ(v.p.second, "hi");
+}
+
+TEST(ParseJsonTest, ParsesNestedTuple)
+{
+  auto v = Parse<test_types::TupleNested>(R"({"t":[[1,2],3]})");
+  EXPECT_EQ(std::get<0>(std::get<0>(v.t)), 1);
+  EXPECT_EQ(std::get<1>(std::get<0>(v.t)), 2);
+  EXPECT_EQ(std::get<1>(v.t), 3);
+}
+
+TEST(ParseJsonTest, ParsesTupleOfObjects)
+{
+  auto v = Parse<test_types::TupleOfObjs>(R"({"t":[{"v":7},9]})");
+  EXPECT_EQ(std::get<0>(v.t).v, 7);
+  EXPECT_EQ(std::get<1>(v.t), 9);
+}
+
+// A tuple element that is std::optional may hold a value or be null.
+TEST(ParseJsonTest, ParsesTupleOfOptionalElement)
+{
+  auto v = Parse<test_types::TupleOfOptional>(R"({"t":[7,9]})");
+  ASSERT_TRUE(std::get<0>(v.t).has_value());
+  EXPECT_EQ(std::get<0>(v.t).value(), 7);
+  EXPECT_EQ(std::get<1>(v.t), 9);
+}
+
+TEST(ParseJsonTest, ParsesTupleOfOptionalElementNull)
+{
+  auto v = Parse<test_types::TupleOfOptional>(R"({"t":[null,9]})");
+  EXPECT_FALSE(std::get<0>(v.t).has_value());
+  EXPECT_EQ(std::get<1>(v.t), 9);
+}
+
+//---------------------------------------------------------------------------//
+// Tuples combined with annotations:                                         //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesTupleWithPosition)
+{
+  auto v = Parse<test_types::TuplePositioned>(R"({"t":[1,2],"a":3})");
+  EXPECT_EQ(v.t, (std::tuple<int, int>{1, 2}));
+  EXPECT_EQ(v.a, 3);
+}
+
+TEST(ParseJsonTest, ParsesTupleWithDisplayName)
+{
+  auto v = Parse<test_types::TupleDisplayName>(R"({"vec":[1,2],"rest":5})");
+  EXPECT_EQ(v.t, (std::tuple<int, int>{1, 2}));
+  EXPECT_EQ(v.rest, 5);
+}
+
+TEST(ParseJsonTest, ParsesTupleInAlphabeticalStruct)
+{
+  auto v =
+      Parse<test_types::TupleAlpha>(R"({"apple":[1,2],"banana":3,"cherry":4})");
+  EXPECT_EQ(v.apple, (std::tuple<int, int>{1, 2}));
+  EXPECT_EQ(v.banana, 3);
+  EXPECT_EQ(v.cherry, 4);
+}
+
+// A tuple field in the middle of a NotCompressed struct, with whitespace on
+// both sides of every delimiter.
+TEST(ParseJsonTest, ParsesNotCompressedTuple)
+{
+  auto v = Parse<test_types::TupleSpaced>(R"({ "t" : [ 1 , 2 ] , "x" : 3 })");
+  EXPECT_EQ(v.t, (std::tuple<int, int>{1, 2}));
+  EXPECT_EQ(v.x, 3);
+}
+
+TEST(ParseJsonTest, ParsesTupleConvoluted)
+{
+  auto v = Parse<test_types::TupleConvoluted>(
+      R"({ "t" : [1,2] , "b" : 3 , "maybe" : 4 , "pair" : [7,"hi"] , "nested" : [ [5,6] , 8 ] })");
+
+  EXPECT_EQ(v.t, (std::tuple<int, int>{1, 2}));
+  EXPECT_EQ(v.b, 3);
+  ASSERT_TRUE(v.maybe.has_value());
+  EXPECT_EQ(v.maybe.value(), 4);
+  EXPECT_EQ(v.p.first, 7);
+  EXPECT_EQ(v.p.second, "hi");
+  EXPECT_EQ(std::get<0>(std::get<0>(v.nested)), 5);
+  EXPECT_EQ(std::get<1>(std::get<0>(v.nested)), 6);
+  EXPECT_EQ(std::get<1>(v.nested), 8);
+}
+
 //===========================================================================//
 // Known limitations (documented; disabled until fixed):                     //
 //===========================================================================//
@@ -459,3 +650,18 @@ TEST(ParseJsonTest, StringInMiddle)
 //  * Containers/arrays: hit `static_assert(false)` in ParseJson (not
 //    implemented).
 //  * std::variant: not supported.
+//  * Optional tuples (std::optional<std::tuple<...>>): NOT supported and does
+//    not even compile. ParseVal routes the optional to the object parser,
+//    which then tries to reflect std::tuple's members and hits libstdc++'s
+//    non-field `__constructible` member in GetRelFields. The intended test:
+//
+//      struct OptionalTuple
+//      {
+//        [[= yjson::MayAbsent{}]] std::optional<std::tuple<int, int>> t;
+//        int rest;
+//      };
+//
+//      auto v = Parse<OptionalTuple>(R"({"t":[1,2],"rest":9})");
+//      ASSERT_TRUE(v.t.has_value());
+//      EXPECT_EQ(v.t.value(), (std::tuple<int, int>{1, 2}));
+//      EXPECT_EQ(v.rest, 9);

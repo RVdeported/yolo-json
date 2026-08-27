@@ -163,7 +163,7 @@ struct ObjectParser
   {
     static_assert(IsTuple(T));
     assert(curr && end);
-    assert(*curr = '[');
+    assert(*curr == '[');
     constexpr auto types = std::define_static_array(std::meta::template_arguments_of(T));
     constexpr auto sz = types.size(); 
     
@@ -294,6 +294,9 @@ struct ObjectParser
       auto [after, v] = ParseTuple<T, compressed>(curr, end);
       curr = after;
       out = v;
+
+      if constexpr (!compressed)
+        SKP_SPC();
     }
     else if constexpr (IsBase<T>())
     {
