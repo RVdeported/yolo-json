@@ -115,162 +115,173 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   std::unreachable();
 }
 
-// typename<std::meta::info curr_fwld>
-// std::pair<char *, typename[:curr_fld:]> ParseObj(char * curr, char const * end, std::meta::info curr_ann);
-
-
-
-template <std::meta::info T>
-std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end);
-
-typename<std::meta::info curr_fld>
-std::pair<char *, typename[:curr_fld:]> ParseObj(char * curr, char * end, std::meta::info curr_ann)
+namespace detail
 {
-  typename [:curr_fld:] out;
-  constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
-    // constexpr std::string_view name;
-    
-  std::string_view disp_name = std::string_view(curr_ann.m_disp_name.begin());
-  std::string_view name = curr_ann.m_disp_name[0] == '\0' 
-    ? ident 
-    : disp_name;
-  // auto name =
-  //     curr_ann.m_disp_name[0] == '\0' ? ident : curr_ann.m_disp_name.data();
-  constexpr auto t = std::meta::type_of(curr_fld);
-  constexpr auto base_cls = std::meta::has_template_arguments(t)
-                                ? std::meta::template_arguments_of(t)[0]
-                                : t;
-  
-  if constexpr (!strAnnots.m_compressed)
-    SKP_SPC();
 
-  if constexpr (curr_ann.m_may_absent)
+// The mutually recursive object parser. Member functions may call each other
+// regardless of declaration order, which avoids redeclaring function templates
+// whose return type contains a reflection splice.
+struct ObjectParser
+{
+  template <std::meta::info T>
+  static std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
   {
-    static_assert(IsOption<std::meta::type_of(curr_fld)>());
-    if (end - curr < name.size() + 2)
-      continue;
-    char * old = curr;
-    SKP_IF_SV_G(name);
-    // field is absent
-    if (curr == old)
-    {
-      out = std::nullopt;
-      curr--;
-      return {curr, out};
-    }
-  }
-  else
-  {
-    if constexpr (!strAnnots.m_compressed)
-      SKP_SPC();
-
-    assert(*curr == '"');
-    SKP_STR_SV(name);
-  }
-  if constexpr (!strAnnots.m_compressed)
-    SKP_SPC();
-
-  assert(*curr == ':');
-  curr++;
-
-  if constexpr (!strAnnots.m_compressed)
-    SKP_SPC();
-
-  if constexpr (IsOption<t>())
-  {
-    if (*curr == 'n')
-    {
-      SKP_STR("null") 
-      out = std::nullopt;
-      if constexpr (!strAnnots.m_compressed)
-        SKP_SPC();
-      return {curr, out};
-    }
-  }
-
-  if constexpr (IsBool(base_cls))
-  {
-    if (*curr == 't')
-    {
-      SKP_STR("true")
-      out = true; 
-    }
-    else
-    {
-      SKP_STR("false")
-      out = false; 
-    }
-    if constexpr (!strAnnots.m_compressed)
-      SKP_SPC();
-  }
-  else
-  if constexpr (IsBase<t>())
-  {
-    constexpr char Delim = idx == sz - 1 ? '}' : ',';
-    auto [after, v] =
-        ParseBase<base_cls == ^^char ? t : base_cls, Delim, curr_ann.m_ignore,
-                  curr_ann.m_min_sz, curr_ann.m_sz>(curr, end);
-    curr = after;
-    out = v;
-
-    if constexpr (!strAnnots.m_compressed)
-      SKP_SPC();
-  }
-  else if constexpr (IsContainer<t>())
-  {
-    // not implemented
-    static_assert(false);
-  }
-  // should be aonother object then
-  else
-  {
+    using T_ = typename[:T:];
+    T_ out{};
+    assert(curr);
     assert(*curr == '{');
-    if constexpr(curr_ann.m_ignore && curr_ann.m_sz > 0)
+    constexpr auto flds = GetRelFields<T_>();
+    constexpr auto flds_ord = GetOrderedField<T_>();
+    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
+    constexpr auto sz = flds.size();
+
+    template for (constexpr auto idx : std::views::indices(sz))
     {
-      curr += curr_ann.m_sz;
+      curr++;
+      constexpr auto curr_fld = flds[flds_ord[idx]];
+
+      auto [after, v] =
+          ParseObj<curr_fld, idx, sz, strAnnots.m_compressed>(curr, end);
+      curr = after;
+
+      out.[:curr_fld:] = v;
+    }
+    if constexpr (!strAnnots.m_compressed)
+      SKP_SPC();
+    assert(*curr == '}');
+    curr++;
+    if constexpr (!strAnnots.m_compressed)
+      SKP_SPC();
+    return {curr, out};
+  }
+
+  // Parse a single field of the object being parsed. `curr` points at the
+  // field's key; the returned pointer points at the delimiter following the
+  // value (or at the re-wound key when an optional field is absent).
+  template <std::meta::info curr_fld, std::size_t idx, std::size_t sz,
+            bool compressed>
+  static std::pair<char *, typename[:std::meta::type_of(curr_fld):]> ParseObj(char * curr,
+                                                          char * end)
+  {
+    constexpr auto t = std::meta::type_of(curr_fld);
+    typename[:t:] out{};
+    constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
+    constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
+
+    std::string_view disp_name =
+        std::string_view(curr_ann.m_disp_name.begin());
+    std::string_view name =
+        curr_ann.m_disp_name[0] == '\0' ? ident : disp_name;
+
+    constexpr auto base_cls = std::meta::has_template_arguments(t)
+                                  ? std::meta::template_arguments_of(t)[0]
+                                  : t;
+
+    if constexpr (!compressed)
+      SKP_SPC();
+
+    if constexpr (curr_ann.m_may_absent)
+    {
+      static_assert(IsOption<std::meta::type_of(curr_fld)>());
+      if (end - curr < name.size() + 2)
+        return {curr, out};
+      char * old = curr;
+      SKP_IF_SV_G(name);
+      // field is absent
+      if (curr == old)
+      {
+        out = std::nullopt;
+        --curr;
+        return {curr, out};
+      }
     }
     else
     {
-      auto [after, v] = ParseJson<base_cls>(curr, end);
+      if constexpr (!compressed)
+        SKP_SPC();
+
+      assert(*curr == '"');
+      SKP_STR_SV(name);
+    }
+    if constexpr (!compressed)
+      SKP_SPC();
+
+    assert(*curr == ':');
+    curr++;
+
+    if constexpr (!compressed)
+      SKP_SPC();
+
+    if constexpr (IsOption<t>())
+    {
+      if (*curr == 'n')
+      {
+        SKP_STR("null")
+        out = std::nullopt;
+        if constexpr (!compressed)
+          SKP_SPC();
+        return {curr, out};
+      }
+    }
+
+    if constexpr (IsBool(base_cls))
+    {
+      if (*curr == 't')
+      {
+        SKP_STR("true")
+        out = true;
+      }
+      else
+      {
+        SKP_STR("false")
+        out = false;
+      }
+      if constexpr (!compressed)
+        SKP_SPC();
+    }
+    else if constexpr (IsBase<t>())
+    {
+      constexpr char Delim = idx == sz - 1 ? '}' : ',';
+      auto [after, v] =
+          ParseBase<base_cls == ^^char ? t : base_cls, Delim,
+                    curr_ann.m_ignore, curr_ann.m_min_sz, curr_ann.m_sz>(
+              curr, end);
       curr = after;
       out = v;
+
+      if constexpr (!compressed)
+        SKP_SPC();
     }
+    else if constexpr (IsContainer<t>())
+    {
+      // not implemented
+      static_assert(false);
+    }
+    // should be another object then
+    else
+    {
+      assert(*curr == '{');
+      if constexpr (curr_ann.m_ignore && curr_ann.m_sz > 0)
+      {
+        curr += curr_ann.m_sz;
+      }
+      else
+      {
+        auto [after, v] = ParseJson<base_cls>(curr, end);
+        curr = after;
+        out = v;
+      }
+    }
+    return {curr, out};
   }
-  return {curr, out};
-}
+};
+
+} // namespace detail
 
 template <std::meta::info T>
 std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
 {
-  using T_ = typename[:T:];
-  T_ out{};
-  assert(curr);
-  char * start = curr;
-  assert(*curr == '{');
-  constexpr auto flds = GetRelFields<T_>();
-  constexpr auto flds_ord = GetOrderedField<T_>();
-  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
-  constexpr auto fieldAnnots = FieldAnnots::MkFldAnnots<T_>();
-  constexpr auto sz = flds.size();
-
-  template for (constexpr auto idx : std::views::indices(sz))
-  {
-    curr++;
-    constexpr auto curr_fld = flds[flds_ord[idx]];
-    constexpr auto curr_ann = fieldAnnots[flds_ord[idx]];
-    
-    auto [after, v] = ParseObj<curr_fld>(curr, end, curr_ann);
-    curr = after;
-    
-    out.[:curr_fld:] = v;
-  }
-  if constexpr (!strAnnots.m_compressed)
-    SKP_SPC();
-  assert(*curr == '}');
-  curr++;
-  if constexpr (!strAnnots.m_compressed)
-    SKP_SPC();
-  return {curr, out};
+  return detail::ObjectParser::ParseJson<T>(curr, end);
 }
 
 // template<std::meta::info T, bool Compressed = true> 
