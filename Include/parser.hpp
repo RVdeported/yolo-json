@@ -289,9 +289,10 @@ struct ObjectParser
       if constexpr (!compressed)
         SKP_SPC();
     }
-    else if constexpr (IsTuple(T))
+    else if constexpr (IsTuple(T) || IsTuple(base_cls))
     {
-      auto [after, v] = ParseTuple<T, compressed>(curr, end);
+      constexpr auto _T = IsTuple(T) ? T : base_cls;
+      auto [after, v] = ParseTuple<_T, compressed>(curr, end);
       curr = after;
       out = v;
 

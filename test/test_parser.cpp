@@ -259,6 +259,38 @@ struct[[= yjson::NotCompressed{}]] TupleConvoluted
   std::tuple<std::tuple<int, int>, int> nested;
 };
 
+// An optional tuple field (std::optional<std::tuple<...>>), which may hold a
+// value, be null, or (with MayAbsent) be missing entirely.
+struct OptionalTuple
+{
+  [[= yjson::MayAbsent{}]] std::optional<std::tuple<int, int>> t;
+  int rest;
+};
+
+// An optional tuple with mixed element types.
+struct OptionalTupleMixed
+{
+  [[= yjson::MayAbsent{}]] std::optional<
+      std::tuple<int, double, std::string, bool>>
+      t;
+  int rest;
+};
+
+// An optional std::pair field (parsed like a two-element optional tuple).
+struct OptionalPair
+{
+  [[= yjson::MayAbsent{}]] std::optional<std::pair<int, std::string>> p;
+  int rest;
+};
+
+// An optional tuple whose first element is itself a nested tuple.
+struct OptionalTupleNested
+{
+  [[= yjson::MayAbsent{}]] std::optional<std::tuple<std::tuple<int, int>, int>>
+      t;
+  int rest;
+};
+
 } // namespace test_types
 
 //---------------------------------------------------------------------------//
@@ -637,6 +669,63 @@ TEST(ParseJsonTest, ParsesTupleConvoluted)
   EXPECT_EQ(std::get<1>(v.nested), 8);
 }
 
+//---------------------------------------------------------------------------//
+// Optional tuples (std::optional<std::tuple<...>> / std::pair):             //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesOptionalTupleWhenPresent)
+{
+  auto v = Parse<test_types::OptionalTuple>(R"({"t":[1,2],"rest":9})");
+  ASSERT_TRUE(v.t.has_value());
+  EXPECT_EQ(v.t.value(), (std::tuple<int, int>{1, 2}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesOptionalTupleWhenNull)
+{
+  auto v = Parse<test_types::OptionalTuple>(R"({"t":null,"rest":9})");
+  EXPECT_FALSE(v.t.has_value());
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesOptionalTupleWhenAbsent)
+{
+  auto v = Parse<test_types::OptionalTuple>(R"({"rest":9})");
+  EXPECT_FALSE(v.t.has_value());
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesOptionalTupleMixedTypes)
+{
+  auto v = Parse<test_types::OptionalTupleMixed>(
+      R"({"t":[1,2.5,"hi",true],"rest":9})");
+  ASSERT_TRUE(v.t.has_value());
+  EXPECT_EQ(std::get<0>(v.t.value()), 1);
+  EXPECT_DOUBLE_EQ(std::get<1>(v.t.value()), 2.5);
+  EXPECT_EQ(std::get<2>(v.t.value()), "hi");
+  EXPECT_TRUE(std::get<3>(v.t.value()));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesOptionalPairWhenPresent)
+{
+  auto v = Parse<test_types::OptionalPair>(R"({"p":[7,"hi"],"rest":9})");
+  ASSERT_TRUE(v.p.has_value());
+  EXPECT_EQ(v.p.value().first, 7);
+  EXPECT_EQ(v.p.value().second, "hi");
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesOptionalTupleNested)
+{
+  auto v =
+      Parse<test_types::OptionalTupleNested>(R"({"t":[[1,2],3],"rest":9})");
+  ASSERT_TRUE(v.t.has_value());
+  EXPECT_EQ(std::get<0>(std::get<0>(v.t.value())), 1);
+  EXPECT_EQ(std::get<1>(std::get<0>(v.t.value())), 2);
+  EXPECT_EQ(std::get<1>(v.t.value()), 3);
+  EXPECT_EQ(v.rest, 9);
+}
+
 //===========================================================================//
 // Known limitations (documented; disabled until fixed):                     //
 //===========================================================================//
@@ -650,18 +739,3 @@ TEST(ParseJsonTest, ParsesTupleConvoluted)
 //  * Containers/arrays: hit `static_assert(false)` in ParseJson (not
 //    implemented).
 //  * std::variant: not supported.
-//  * Optional tuples (std::optional<std::tuple<...>>): NOT supported and does
-//    not even compile. ParseVal routes the optional to the object parser,
-//    which then tries to reflect std::tuple's members and hits libstdc++'s
-//    non-field `__constructible` member in GetRelFields. The intended test:
-//
-//      struct OptionalTuple
-//      {
-//        [[= yjson::MayAbsent{}]] std::optional<std::tuple<int, int>> t;
-//        int rest;
-//      };
-//
-//      auto v = Parse<OptionalTuple>(R"({"t":[1,2],"rest":9})");
-//      ASSERT_TRUE(v.t.has_value());
-//      EXPECT_EQ(v.t.value(), (std::tuple<int, int>{1, 2}));
-//      EXPECT_EQ(v.rest, 9);
