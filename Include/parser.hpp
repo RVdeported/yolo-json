@@ -3,10 +3,12 @@
 #include "Include/utils.hpp"
 #include <cassert>
 #include <iostream>
+#include <limits>
 #include <meta>
 #include <print>
 #include <ranges>
 #include <span>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -81,14 +83,23 @@ template <class T> consteval auto GetOrderedField()
   return out;
 }
 
-template <std::meta::info T, char Delim = ',', bool Ignore = false,
-          int MinSz = 0, int FxSz = -1>
+template <std::meta::info T, char Delim1 = ',', bool Ignore = false,
+          int MinSz = 0, int FxSz = -1, char Delim2 = Delim1>
 std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
 {
   static_assert(IsBase<T>());
   constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
   constexpr bool integral = std::meta::is_integral_type(T);
   constexpr bool floating = std::meta::is_floating_point_type(T);
+  
+  char Delim = Delim1;
+  if constexpr(Delim1 != Delim2)
+  {
+    char const * from = curr;
+    char const * d1 = std::find(from, end, Delim1);
+    char const * d2 = std::find(from, end, Delim2);
+    Delim = d1 < d2 ? Delim1 : Delim2;
+  }
 
   if constexpr (Ignore)
   {
@@ -186,8 +197,45 @@ struct ObjectParser
     curr++;
 
     return {curr, out};
-    
   }
+
+  template<std::meta::info T, bool Compressed = true> 
+  static std::pair<char *, typename[:T:]> ParseContainer(char * curr, char * end)
+  {
+    static_assert(IsContainer<T>());
+    assert(curr && end);
+    assert(*curr == '[');
+    constexpr auto tt = std::meta::template_arguments_of(T)[0];
+    constexpr bool fixed = std::meta::template_of(T) == ^^std::array;
+
+    typename[:T:] out;
+
+    for (auto idx :
+         std::views::indices(fixed ? int(out.size())
+                                   : std::numeric_limits<int>::max()))
+    {
+      assert(idx == 0 || *curr == ',');
+      curr++;
+
+      if constexpr(!Compressed)
+        SKP_SPC();
+
+      auto [after, v] = ParseVal<tt, 0, -1, Compressed, ',', false, ']'>(curr, end);
+
+      if constexpr (fixed)
+        out[idx] = v;
+      else
+        out.emplace_back(v);
+      curr = after;
+
+      if (*curr == ']')
+        break;
+    }
+    curr++;
+
+    return {curr, out};
+  }
+
 
   // Parse a single field of the object being parsed. `curr` points at the
   // field's key; the returned pointer points at the delimiter following the
@@ -252,7 +300,7 @@ struct ObjectParser
   }
 
   template <std::meta::info T, int sz, int min_sz,
-            bool compressed, char Delim, bool ignore = false>
+            bool compressed, char Delim1, bool ignore = false, char Delim2 = Delim1>
   static std::pair<char *, typename[:T:]> ParseVal(char * curr,
                                                           char * end)
   {
@@ -302,8 +350,8 @@ struct ObjectParser
     else if constexpr (IsBase<T>())
     {
       auto [after, v] =
-          ParseBase<base_cls == ^^char ? T : base_cls, Delim,
-                    ignore, min_sz, sz>(
+          ParseBase<base_cls == ^^char ? T : base_cls, Delim1,
+                    ignore, min_sz, sz, Delim2>(
               curr, end);
       curr = after;
       out = v;
@@ -313,8 +361,10 @@ struct ObjectParser
     }
     else if constexpr (IsContainer<T>())
     {
-      // not implemented
-      static_assert(false);
+      constexpr auto _T = IsContainer<T>() ? T : base_cls;
+      auto [after, v] = ParseContainer<_T, compressed>(curr, end);
+      curr = after;
+      out = v;
     }
     // should be another object then
     else

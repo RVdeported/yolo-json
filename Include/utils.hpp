@@ -305,14 +305,26 @@ template <std::meta::info T> consteval bool IsOption();
 
 template <std::meta::info T> consteval bool IsContainer()
 {
-  constexpr auto funcs = GetRelFuncs<T>();
-  constexpr bool is_base = IsBase<T>();
-  constexpr bool has_begin = HasFuncWithName<T>("begin");
-  constexpr bool has_end = HasFuncWithName<T>("end");
-  constexpr bool has_push_b = HasFuncWithName<T>("push_back");
-  constexpr bool has_push = HasFuncWithName<T>("push");
+  if constexpr (IsBase<T>())
+  {
+    return false;
+  }
+  else if constexpr (std::meta::has_template_arguments(T)
+                     && std::meta::template_of(T) == ^^std::array)
+  {
+    // Fixed-size containers (std::array) lack push_back/emplace_back, so the
+    // dynamic-container probe below would miss them.
+    return true;
+  }
+  else
+  {
+    constexpr bool has_begin = HasFuncWithName<T>("begin");
+    constexpr bool has_end = HasFuncWithName<T>("end");
+    constexpr bool has_push_b = HasFuncWithName<T>("push_back");
+    constexpr bool has_push = HasFuncWithName<T>("push");
 
-  return !is_base && has_begin && has_end && (has_push_b | has_push);
+    return has_begin && has_end && (has_push_b || has_push);
+  }
 }
 
 template <std::meta::info T> consteval bool IsVariant()

@@ -6,11 +6,14 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstring>
+#include <deque>
 #include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 //---------------------------------------------------------------------------//
 // Test structs:                                                             //
@@ -288,6 +291,52 @@ struct OptionalTupleNested
 {
   [[= yjson::MayAbsent{}]] std::optional<std::tuple<std::tuple<int, int>, int>>
       t;
+  int rest;
+};
+
+//---------------------------------------------------------------------------//
+// Containers (fixed std::array / dynamic std::vector):                      //
+//---------------------------------------------------------------------------//
+
+// A fixed-size container (std::array) field.
+struct ArrayOfInts
+{
+  std::array<int, 3> a;
+  int rest;
+};
+
+// A fixed-size container of strings.
+struct ArrayOfStrings
+{
+  std::array<std::string, 2> a;
+  int rest;
+};
+
+// A dynamic container (std::vector) field.
+struct VectorOfInts
+{
+  std::vector<int> v;
+  int rest;
+};
+
+// A dynamic container of strings.
+struct VectorOfStrings
+{
+  std::vector<std::string> v;
+  int rest;
+};
+
+// A dynamic container whose elements are nested objects.
+struct VectorOfObjs
+{
+  std::vector<Leaf> v;
+  int rest;
+};
+
+// Another dynamic container type (std::deque) using the push_back path.
+struct DequeOfInts
+{
+  std::deque<int> d;
   int rest;
 };
 
@@ -726,6 +775,54 @@ TEST(ParseJsonTest, ParsesOptionalTupleNested)
   EXPECT_EQ(v.rest, 9);
 }
 
+//---------------------------------------------------------------------------//
+// Containers (fixed std::array / dynamic std::vector):                      //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesFixedArrayOfInts)
+{
+  auto v = Parse<test_types::ArrayOfInts>(R"({"a":[1,2,3],"rest":9})");
+  EXPECT_EQ(v.a, (std::array<int, 3>{1, 2, 3}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesFixedArrayOfStrings)
+{
+  auto v = Parse<test_types::ArrayOfStrings>(R"({"a":["x","yz"],"rest":9})");
+  EXPECT_EQ(v.a, (std::array<std::string, 2>{"x", "yz"}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesDynamicVectorOfInts)
+{
+  auto v = Parse<test_types::VectorOfInts>(R"({"v":[4,5,6],"rest":9})");
+  EXPECT_EQ(v.v, (std::vector<int>{4, 5, 6}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesDynamicVectorOfStrings)
+{
+  auto v = Parse<test_types::VectorOfStrings>(R"({"v":["a","b"],"rest":9})");
+  EXPECT_EQ(v.v, (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesDynamicVectorOfObjects)
+{
+  auto v = Parse<test_types::VectorOfObjs>(
+      R"({"v":[{"v":1},{"v":2}],"rest":9})");
+  ASSERT_EQ(v.v.size(), 2u);
+  EXPECT_EQ(v.v[0].v, 1);
+  EXPECT_EQ(v.v[1].v, 2);
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesDynamicDequeOfInts)
+{
+  auto v = Parse<test_types::DequeOfInts>(R"({"d":[7,8],"rest":9})");
+  EXPECT_EQ(v.d, (std::deque<int>{7, 8}));
+  EXPECT_EQ(v.rest, 9);
+}
+
 //===========================================================================//
 // Known limitations (documented; disabled until fixed):                     //
 //===========================================================================//
@@ -736,6 +833,10 @@ TEST(ParseJsonTest, ParsesOptionalTupleNested)
 //
 //  * char fields: treated as an integer, so quoted character values do not
 //    round-trip.
-//  * Containers/arrays: hit `static_assert(false)` in ParseJson (not
-//    implemented).
 //  * std::variant: not supported.
+//  * Empty containers (`[]`): ParseContainer assumes at least one element, so
+//    an empty JSON array trips a ReadInt assertion.
+//  * Optional containers (std::optional<std::vector<...>> /
+//    std::optional<std::array<...>>): NOT supported. ParseVal's container
+//    branch only inspects IsContainer<T>, not the optional's inner type, so
+//    the wrapper is routed to the object parser instead.
