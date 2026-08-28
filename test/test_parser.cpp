@@ -377,10 +377,22 @@ struct DequeOfInts
   int rest;
 };
 
-// A fixed-size container of strings.
+// A nested container of strings.
 struct ArrayMixedNested
 {
   std::array<std::vector<std::string>, 2> a;
+  int rest;
+};
+
+struct ArrayOptional
+{
+  std::optional<std::array<int, 2>> a;
+  int rest;
+};
+
+struct VectorOptional
+{
+  std::optional<std::vector<int>> a;
   int rest;
 };
 } // namespace test_types
@@ -929,6 +941,57 @@ TEST(ParseJsonTest, ParsesMixedArrayNested)
         {{{"x","yz"},{"aaa","bbb","ccc"}}}));
   EXPECT_EQ(v.rest, 9);
 }
+
+TEST(ParseJsonTest, ParsesOptionalArray)
+{
+  auto v = Parse<test_types::ArrayOptional>(
+      R"({"a":[22,33],"rest":9})");
+  EXPECT_EQ(v.a.value(), (std::array<int, 2>{22,33}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+
+TEST(ParseJsonTest, ParsesOptionalArrayNull)
+{
+  auto v = Parse<test_types::ArrayOptional>(
+      R"({"a":null,"rest":9})");
+  EXPECT_FALSE(v.a.has_value());
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesOptionalVector)
+{
+  auto v = Parse<test_types::VectorOptional>(
+      R"({"a":[22,33],"rest":9})");
+  EXPECT_EQ(v.a.value(), (std::vector<int>{22,33}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+
+TEST(ParseJsonTest, ParsesOptionalVectorNull)
+{
+  auto v = Parse<test_types::VectorOptional>(
+      R"({"a":null,"rest":9})");
+  EXPECT_FALSE(v.a.has_value());
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesEmptyContainer)
+{
+  auto v = Parse<test_types::VectorOfInts>(
+      R"({"v":[],"rest":9})");
+  EXPECT_TRUE(v.v.empty());
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesNotFullArray)
+{
+  auto v = Parse<test_types::ArrayOfInts>(
+      R"({"a":[1],"rest":9})");
+  EXPECT_EQ(v.a, (std::array<int,3>{1,0,0}));
+  EXPECT_EQ(v.rest, 9);
+}
+
 //===========================================================================//
 // Known limitations (documented; disabled until fixed):                     //
 //===========================================================================//
@@ -942,7 +1005,3 @@ TEST(ParseJsonTest, ParsesMixedArrayNested)
 //  * std::variant: not supported.
 //  * Empty containers (`[]`): ParseContainer assumes at least one element, so
 //    an empty JSON array trips a ReadInt assertion.
-//  * Optional containers (std::optional<std::vector<...>> /
-//    std::optional<std::array<...>>): NOT supported. ParseVal's container
-//    branch only inspects IsContainer<T>, not the optional's inner type, so
-//    the wrapper is routed to the object parser instead.

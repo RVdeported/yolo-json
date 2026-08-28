@@ -305,6 +305,9 @@ struct ObjectParser
     constexpr bool fixed = std::meta::template_of(T) == ^^std::array;
 
     typename[:T:] out;
+    
+    if (*(curr + 1) == ']')
+      return {curr + 2, out};
 
     for (auto idx :
          std::views::indices(fixed ? int(out.size())
@@ -323,7 +326,7 @@ struct ObjectParser
       else
         out.emplace_back(v);
       curr = after;
-
+      
       if (*curr == ']')
         break;
     }
@@ -402,9 +405,12 @@ struct ObjectParser
   {
     static_assert(IsSupported<T>());
     typename [:T:] out;
-    constexpr auto base_cls = std::meta::has_template_arguments(T)
-                                  ? std::meta::template_arguments_of(T)[0]
-                                  : T;
+    // constexpr auto base_cls = std::meta::has_template_arguments(T)
+    //                               ? std::meta::template_arguments_of(T)[0]
+    //                               : T;
+    constexpr auto base_cls = IsOption<T>() 
+      ? std::meta::template_arguments_of(T)[0]
+      : T;
     static_assert(!std::meta::is_array_type(T));
     static_assert(!std::meta::is_array_type(base_cls));
 
@@ -458,10 +464,9 @@ struct ObjectParser
       if constexpr (!compressed)
         SKP_SPC();
     }
-    else if constexpr (IsContainer<T>())
+    else if constexpr (IsContainer<base_cls>())
     {
-      constexpr auto _T = IsContainer<T>() ? T : base_cls;
-      auto [after, v] = ParseContainer<_T, compressed>(curr, end);
+      auto [after, v] = ParseContainer<base_cls, compressed>(curr, end);
       curr = after;
       out = v;
     }
