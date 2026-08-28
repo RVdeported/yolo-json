@@ -1003,5 +1003,3 @@ TEST(ParseJsonTest, ParsesNotFullArray)
 //  * char fields: treated as an integer, so quoted character values do not
 //    round-trip.
 //  * std::variant: not supported.
-//  * Empty containers (`[]`): ParseContainer assumes at least one element, so
-//    an empty JSON array trips a ReadInt assertion.
