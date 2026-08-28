@@ -42,6 +42,12 @@ struct[[ = yjson::NotCompressed{}, = yjson::Alphabetical{false} ]] NotComp
   int a;
 };
 
+struct[[= yjson::RandomOrder{}]] RandomOrd
+{
+  int a;
+  int b;
+};
+
 // One field per supported field-annotation, plus a plain fallback field.
 struct AnnotatedFields
 {
@@ -112,6 +118,7 @@ TEST(StructAnnotationsTest, Defaults)
   constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::Plain>();
   EXPECT_FALSE(a.m_alphabetical.has_value());
   EXPECT_TRUE(a.m_compressed);
+  EXPECT_FALSE(a.m_random_order);
 }
 
 TEST(StructAnnotationsTest, AlphabeticalForward)
@@ -135,6 +142,14 @@ TEST(StructAnnotationsTest, NotCompressed)
   EXPECT_TRUE(a.m_alphabetical.has_value());
   EXPECT_FALSE(a.m_alphabetical.value());
   EXPECT_FALSE(a.m_compressed);
+}
+
+TEST(StructAnnotationsTest, RandomOrder)
+{
+  constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::RandomOrd>();
+  EXPECT_FALSE(a.m_alphabetical.has_value());
+  EXPECT_TRUE(a.m_compressed);
+  EXPECT_TRUE(a.m_random_order);
 }
 
 //---------------------------------------------------------------------------//

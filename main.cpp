@@ -12,6 +12,7 @@
 #include <ranges>
 #include <type_traits>
 #include <vector>
+#include <cassert>
 
 struct [[= yjson::NotCompressed{}]] B
 {
@@ -107,6 +108,7 @@ template <typename T> void print_(T & A, std::ostream & stream)
 struct Opt
 {
   [[= yjson::MayAbsent{}]] std::optional<int> opt;
+  std::array<int,2> tp;
   [[= yjson::DisplayName{"test"}]] int rest;
 };
 int main()
@@ -120,11 +122,15 @@ int main()
   //
   // std::cout << a.c << "|" << a.a.value_or(0) << "|" << a.ss << "|" << a.bb.d << '\n';
 
-  char buf[] = R"({"opt":23,"test":9})";
+  char buf[] = R"({"opt":23,"tp":[1,4],"test":9})";
   auto [rest, v] =
       yjson::ParseJson<^^Opt>(buf, buf + std::strlen(buf));
   (void)rest;
-  // static_assert(have[1] == -1);
+   std::cout << sizeof(v.tp) << '\n';
+  
+   static_assert(std::is_copy_assignable_v<std::string>);
+   static_assert(std::is_copy_assignable_v<std::vector<int>>);
+   static_assert(!std::is_copy_assignable_v<int[6]>);
   // template for (constexpr auto v : ss)
   // {
   //   // if constexpr (std::meta::has_identifier(v))

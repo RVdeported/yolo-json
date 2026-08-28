@@ -12,6 +12,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace yjson
 {
@@ -98,6 +99,10 @@ struct NotCompressed
 };
 
 struct NonStrictOrder
+{
+};
+
+struct RandomOrder
 {
 };
 //----------------------//
@@ -204,6 +209,7 @@ struct StructAnnots
 {
   std::optional<bool> m_alphabetical = std::nullopt;
   bool m_compressed = true;
+  bool m_random_order = false;
 
   template <typename T> static consteval StructAnnots MkStrAnnots()
   {
@@ -220,6 +226,13 @@ struct StructAnnots
                   not_compressed.size() > 0)
     {
       out.m_compressed = false;
+    }
+
+    if constexpr (constexpr auto random_order =
+                      get_annotations<RandomOrder, T>();
+                  random_order.size() > 0)
+    {
+      out.m_random_order = true;
     }
 
     return out;
@@ -318,12 +331,13 @@ template <std::meta::info T> consteval bool IsContainer()
   }
   else
   {
+    constexpr bool raw_array = std::meta::is_array_type(T);
     constexpr bool has_begin = HasFuncWithName<T>("begin");
     constexpr bool has_end = HasFuncWithName<T>("end");
     constexpr bool has_push_b = HasFuncWithName<T>("push_back");
     constexpr bool has_push = HasFuncWithName<T>("push");
 
-    return has_begin && has_end && (has_push_b || has_push);
+    return raw_array || (has_begin && has_end && (has_push_b || has_push));
   }
 }
 
@@ -384,6 +398,11 @@ template <std::meta::info T, bool top_lvl> consteval bool IsBase()
     constexpr bool string11 = T == ^^std::__cxx11::basic_string<char>;
     return integral || floating || stringal || string11 || boolean;
   }
+}
+template <std::meta::info T>
+consteval bool IsSupported()
+{
+  return std::is_copy_assignable<typename[:T:]>();
 }
 
 

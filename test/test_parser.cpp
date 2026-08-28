@@ -182,6 +182,43 @@ struct DisplayNamedOpt
 };
 
 //---------------------------------------------------------------------------//
+// RandomOrder (fields may appear in any order):                             //
+//---------------------------------------------------------------------------//
+
+// Basic random-order struct: JSON fields are matched by key, not position.
+struct[[= yjson::RandomOrder{}]] RandomBasic
+{
+  int a;
+  int b;
+  std::string s;
+};
+
+// RandomOrder combined with MayAbsent: the optional field may be present at
+// any position, or absent entirely.
+struct[[= yjson::RandomOrder{}]] RandomOpt
+{
+  int first;
+  [[= yjson::MayAbsent{}]] std::optional<int> maybe;
+  int last;
+};
+
+// RandomOrder combined with DisplayName and NotCompressed (whitespace).
+struct[[ = yjson::RandomOrder{}, = yjson::NotCompressed{} ]] RandomNamed
+{
+  [[= yjson::DisplayName{"renamed"}]] int original;
+  int normal;
+  [[= yjson::MayAbsent{}]] std::optional<std::string> maybe;
+};
+
+// RandomOrder with a nested object field.
+struct[[= yjson::RandomOrder{}]] RandomNested
+{
+  std::string tag;
+  Leaf leaf;
+  int x;
+};
+
+//---------------------------------------------------------------------------//
 // Tuples (std::tuple / std::pair):                                          //
 //---------------------------------------------------------------------------//
 
@@ -340,6 +377,12 @@ struct DequeOfInts
   int rest;
 };
 
+// A fixed-size container of strings.
+struct ArrayMixedNested
+{
+  std::array<std::vector<std::string>, 2> a;
+  int rest;
+};
 } // namespace test_types
 
 //---------------------------------------------------------------------------//
@@ -553,6 +596,61 @@ TEST(ParseJsonTest, ParsesDisplayNameOptionalWhenAbsent)
   auto v = Parse<test_types::DisplayNamedOpt>(R"({"rest":5})");
   EXPECT_FALSE(v.opt.has_value());
   EXPECT_EQ(v.rest, 5);
+}
+
+//---------------------------------------------------------------------------//
+// RandomOrder annotation:                                                   //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesRandomOrderFields)
+{
+  auto v = Parse<test_types::RandomBasic>(R"({"s":"hi","a":1,"b":2})");
+  EXPECT_EQ(v.a, 1);
+  EXPECT_EQ(v.b, 2);
+  EXPECT_EQ(v.s, "hi");
+}
+
+TEST(ParseJsonTest, ParsesRandomOrderReversed)
+{
+  auto v = Parse<test_types::RandomBasic>(R"({"b":2,"s":"hi","a":1})");
+  EXPECT_EQ(v.a, 1);
+  EXPECT_EQ(v.b, 2);
+  EXPECT_EQ(v.s, "hi");
+}
+
+TEST(ParseJsonTest, ParsesRandomOrderOptionalPresent)
+{
+  auto v = Parse<test_types::RandomOpt>(R"({"last":3,"maybe":7,"first":1})");
+  EXPECT_EQ(v.first, 1);
+  ASSERT_TRUE(v.maybe.has_value());
+  EXPECT_EQ(v.maybe.value(), 7);
+  EXPECT_EQ(v.last, 3);
+}
+
+TEST(ParseJsonTest, ParsesRandomOrderOptionalAbsent)
+{
+  auto v = Parse<test_types::RandomOpt>(R"({"last":3,"first":1})");
+  EXPECT_EQ(v.first, 1);
+  EXPECT_FALSE(v.maybe.has_value());
+  EXPECT_EQ(v.last, 3);
+}
+
+TEST(ParseJsonTest, ParsesRandomOrderDisplayNameAndWhitespace)
+{
+  auto v = Parse<test_types::RandomNamed>(
+      R"({ "normal" : 7 , "renamed" : 42 , "maybe" : "hi" })");
+  EXPECT_EQ(v.original, 42);
+  EXPECT_EQ(v.normal, 7);
+  ASSERT_TRUE(v.maybe.has_value());
+  EXPECT_EQ(v.maybe.value(), "hi");
+}
+
+TEST(ParseJsonTest, ParsesRandomOrderNestedObject)
+{
+  auto v =
+      Parse<test_types::RandomNested>(R"({"leaf":{"v":7},"x":9,"tag":"T"})");
+  EXPECT_EQ(v.tag, "T");
+  EXPECT_EQ(v.leaf.v, 7);
+  EXPECT_EQ(v.x, 9);
 }
 
 //---------------------------------------------------------------------------//
@@ -823,6 +921,14 @@ TEST(ParseJsonTest, ParsesDynamicDequeOfInts)
   EXPECT_EQ(v.rest, 9);
 }
 
+TEST(ParseJsonTest, ParsesMixedArrayNested)
+{
+  auto v = Parse<test_types::ArrayMixedNested>(
+      R"({"a":[["x","yz"],["aaa","bbb","ccc"]],"rest":9})");
+  EXPECT_EQ(v.a, (std::array<std::vector<std::string>, 2>
+        {{{"x","yz"},{"aaa","bbb","ccc"}}}));
+  EXPECT_EQ(v.rest, 9);
+}
 //===========================================================================//
 // Known limitations (documented; disabled until fixed):                     //
 //===========================================================================//

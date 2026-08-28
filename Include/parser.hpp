@@ -2,6 +2,7 @@
 #include "Include/json_parser.hpp"
 #include "Include/utils.hpp"
 #include <cassert>
+#include <cstring>
 #include <iostream>
 #include <limits>
 #include <meta>
@@ -138,32 +139,127 @@ struct ObjectParser
   static std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
   {
     using T_ = typename[:T:];
+    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
+
+    if constexpr (strAnnots.m_random_order)
+    {
+      return ParseJsonRandomOrder<T>(curr, end);
+    }
+    else
+    {
+      T_ out{};
+      assert(curr);
+      assert(*curr == '{');
+      constexpr auto flds = GetRelFields<T_>();
+      constexpr auto flds_ord = GetOrderedField<T_>();
+      constexpr auto sz = flds.size();
+
+      template for (constexpr auto idx : std::views::indices(sz))
+      {
+        curr++;
+        constexpr auto curr_fld = flds[flds_ord[idx]];
+        constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
+
+        constexpr char delim = idx + 1 == sz ? '}' : ',';
+        auto [after, v] =
+            ParseObj<curr_fld, curr_ann.m_sz, curr_ann.m_min_sz,  strAnnots.m_compressed,
+          delim>(curr, end);
+        curr = after;
+
+        out.[:curr_fld:] = v;
+      }
+      if constexpr (!strAnnots.m_compressed)
+        SKP_SPC();
+      assert(*curr == '}');
+      curr++;
+      if constexpr (!strAnnots.m_compressed)
+        SKP_SPC();
+      return {curr, out};
+    }
+  }
+
+  // Parse an object whose JSON fields may appear in any order. Every key in
+  // the JSON is matched against the not-yet-parsed fields of the struct (by
+  // identifier or DisplayName); MayAbsent fields simply stay absent when
+  // their key never appears.
+  template <std::meta::info T>
+  static std::pair<char *, typename[:T:]> ParseJsonRandomOrder(char * curr,
+                                                               char * end)
+  {
+    using T_ = typename[:T:];
     T_ out{};
     assert(curr);
     assert(*curr == '{');
     constexpr auto flds = GetRelFields<T_>();
     constexpr auto flds_ord = GetOrderedField<T_>();
-    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
     constexpr auto sz = flds.size();
+    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
+    constexpr auto fldAnnots = FieldAnnots::MkFldAnnots<T_>();
 
-    template for (constexpr auto idx : std::views::indices(sz))
-    {
-      curr++;
-      constexpr auto curr_fld = flds[flds_ord[idx]];
-      constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
-      
-      constexpr char delim = idx + 1 == sz ? '}' : ',';
-      auto [after, v] =
-          ParseObj<curr_fld, curr_ann.m_sz, curr_ann.m_min_sz,  strAnnots.m_compressed, 
-        delim>(curr, end);
-      curr = after;
-
-      out.[:curr_fld:] = v;
-    }
-    if constexpr (!strAnnots.m_compressed)
-      SKP_SPC();
-    assert(*curr == '}');
+    std::array<bool, sz> parsed{};
     curr++;
+
+    while (true)
+    {
+      if constexpr (!strAnnots.m_compressed)
+        SKP_SPC();
+
+      if (*curr == '}')
+      {
+        curr++;
+        break;
+      }
+
+      bool matched = false;
+      template for (constexpr auto i : std::views::indices(sz))
+      {
+        if (!matched && !parsed[i])
+        {
+          constexpr auto curr_fld = flds[flds_ord[i]];
+          constexpr FieldAnnots curr_ann =
+              FieldAnnots::MkFieldAnnots<curr_fld>();
+          constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
+          std::string_view disp_name =
+              std::string_view(curr_ann.m_disp_name.begin());
+          std::string_view name =
+              curr_ann.m_disp_name[0] == '\0' ? ident : disp_name;
+          
+          char * after = curr;
+          SKP_IF_SV_G(name);
+          if (after == curr)
+            continue;
+          
+          matched = true;
+          parsed[i] = true;
+
+          if constexpr (!strAnnots.m_compressed)
+            SKP_SPC();
+          assert(*curr == ':');
+          curr++;
+          if constexpr (!strAnnots.m_compressed)
+            SKP_SPC();
+
+          constexpr auto t = std::meta::type_of(curr_fld);
+          std::tie(curr, out.[:curr_fld:]) =
+              ParseVal<t, curr_ann.m_sz, curr_ann.m_min_sz,
+                       strAnnots.m_compressed, ',', curr_ann.m_ignore, '}'>(
+                  curr, end);
+        }
+      }
+      assert(matched);
+
+      if (*curr == ',')
+        curr++;
+      else
+        assert(*curr == '}');
+    }
+
+    template for (constexpr auto i : std::views::indices(sz))
+    {
+      if constexpr (!fldAnnots[i].m_may_absent)
+        assert(parsed[i]);
+    }
+
     if constexpr (!strAnnots.m_compressed)
       SKP_SPC();
     return {curr, out};
@@ -304,10 +400,13 @@ struct ObjectParser
   static std::pair<char *, typename[:T:]> ParseVal(char * curr,
                                                           char * end)
   {
+    static_assert(IsSupported<T>());
     typename [:T:] out;
     constexpr auto base_cls = std::meta::has_template_arguments(T)
                                   ? std::meta::template_arguments_of(T)[0]
                                   : T;
+    static_assert(!std::meta::is_array_type(T));
+    static_assert(!std::meta::is_array_type(base_cls));
 
 
     if constexpr (IsOption<T>())
