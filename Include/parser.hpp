@@ -11,6 +11,7 @@
 #include <print>
 #include <ranges>
 #include <span>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -149,7 +150,12 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
     else
     {
       GET_STR(Out);
-      return {curr, typename[:T:](Out)};
+      // GET_STR NUL-terminates the field in place; `curr` now points one past
+      // the terminator, so the string length is `curr - Out - 1`. Building from
+      // (ptr, len) avoids a second strlen scan and, for std::string_view, copies
+      // nothing at all (the view just references the input buffer).
+      const std::size_t len = static_cast<std::size_t>(curr - Out - 1);
+      return {curr, typename[:T:](Out, len)};
     }
   }
   std::unreachable();
@@ -269,8 +275,8 @@ struct ObjectParser
           constexpr auto t = std::meta::type_of(curr_fld);
           std::tie(curr, out.[:curr_fld:]) =
               ParseVal<t, curr_ann.m_sz, curr_ann.m_min_sz,
-                       strAnnots.m_compressed, ',', curr_ann.m_ignore, '}'>(
-                  curr, end);
+                       curr_ann.m_static_sz, strAnnots.m_compressed, ',',
+                       curr_ann.m_ignore, '}'>(curr, end);
         }
       }
       assert(matched);
@@ -314,7 +320,8 @@ struct ObjectParser
         SKP_SPC();
 
       auto [after, v] =
-          ParseVal<tt, 0, -1, Compressed, idx == sz - 1 ? ']' : ','>(curr, end);
+          ParseVal<tt, 0, -1, -1, Compressed, idx == sz - 1 ? ']' : ','>(curr,
+                                                                         end);
 
       std::get<idx>(out) = v;
       curr = after;
@@ -360,7 +367,7 @@ struct ObjectParser
         SKP_SPC();
 
       auto [after, v] =
-          ParseVal<tt, 0, -1, Compressed, ',', false, ']'>(curr, end);
+          ParseVal<tt, 0, -1, -1, Compressed, ',', false, ']'>(curr, end);
 
       if constexpr (fixed)
         out[idx] = v;
@@ -375,6 +382,80 @@ struct ObjectParser
     }
     curr++;
 
+    return {curr, out};
+  }
+
+  //--------------------------------------------------------//
+  // ParseContainerStatic (fixed element count)             //
+  //--------------------------------------------------------//
+  // Parse a container whose element count is known at compile time (via the
+  // StaticSize annotation). The loop is fully unrolled (`template for`), the
+  // delimiter after every element is a compile-time constant, and dynamic
+  // containers allocate their final storage once up front — so no per-element
+  // growth checks, no delimiter probing and no runtime break test remain.
+  template <std::meta::info T, int N, bool Compressed = true>
+  static std::pair<char *, typename[:T:]> ParseContainerStatic(char * curr,
+                                                               char * end)
+  {
+    static_assert(IsContainer<T>());
+    static_assert(N >= 0);
+    assert(curr && end);
+    assert(*curr == '[');
+    constexpr auto tt = std::meta::template_arguments_of(T)[0];
+    constexpr bool fixed = std::meta::template_of(T) == ^^std::array;
+
+    if constexpr (fixed)
+      static_assert(N == static_cast<int>(std::tuple_size_v<typename[:T:]>),
+                    "StaticSize must match the std::array element count");
+
+    typename[:T:] out;
+
+    if constexpr (N == 0)
+    {
+      // Empty container: consume "[]" (whitespace tolerant when !Compressed).
+      char * probe = curr + 1;
+      if constexpr (!Compressed)
+        while (isspace(*probe) || *probe == '\n' || *probe == '\t')
+          ++probe;
+      assert(*probe == ']');
+      return {probe + 1, out};
+    }
+
+    // Dynamic containers: size their storage once up front so element parsing
+    // never reallocates. std::deque lacks reserve(), hence the requires-guard.
+    if constexpr (!fixed)
+    {
+      if constexpr (requires { out.reserve(N); })
+        out.reserve(N);
+    }
+
+    template for (constexpr auto idx : std::views::indices(N))
+    {
+      if constexpr (idx > 0)
+        assert(*curr == ',');
+      curr++; // skip '[' (first element) or ',' (subsequent elements)
+
+      if constexpr (!Compressed)
+        SKP_SPC();
+
+      // The delimiter after this element is a compile-time constant: ',' for
+      // every element except the last, which is followed by ']'.
+      constexpr char delim = idx == N - 1 ? ']' : ',';
+      auto [after, v] =
+          ParseVal<tt, 0, -1, -1, Compressed, delim, false, delim>(curr, end);
+
+      if constexpr (fixed)
+        out[idx] = v;
+      else
+        out.emplace_back(v);
+      curr = after;
+
+      if constexpr (!Compressed)
+        SKP_SPC();
+    }
+
+    assert(*curr == ']');
+    curr++;
     return {curr, out};
   }
 
@@ -433,9 +514,8 @@ struct ObjectParser
     if constexpr (!compressed)
       SKP_SPC();
 
-    auto [after, v] =
-        ParseVal<t, sz, min_sz, compressed, Delim, curr_ann.m_ignore>(curr,
-                                                                      end);
+    auto [after, v] = ParseVal<t, sz, min_sz, curr_ann.m_static_sz, compressed,
+                               Delim, curr_ann.m_ignore>(curr, end);
 
     return {after, v};
   }
@@ -443,8 +523,9 @@ struct ObjectParser
   //--------------------------------------------------------//
   // ParseVal                                               //
   //--------------------------------------------------------//
-  template <std::meta::info T, int sz, int min_sz, bool compressed, char Delim1,
-            bool ignore = false, char Delim2 = Delim1>
+  template <std::meta::info T, int sz, int min_sz, int static_sz,
+            bool compressed, char Delim1, bool ignore = false,
+            char Delim2 = Delim1>
   static std::pair<char *, typename[:T:]> ParseVal(char * curr, char * end)
   {
     static_assert(IsSupported<T>());
@@ -506,9 +587,19 @@ struct ObjectParser
     }
     else if constexpr (IsContainer<base_cls>())
     {
-      auto [after, v] = ParseContainer<base_cls, compressed>(curr, end);
-      curr = after;
-      out = v;
+      if constexpr (static_sz >= 0)
+      {
+        auto [after, v] =
+            ParseContainerStatic<base_cls, static_sz, compressed>(curr, end);
+        curr = after;
+        out = v;
+      }
+      else
+      {
+        auto [after, v] = ParseContainer<base_cls, compressed>(curr, end);
+        curr = after;
+        out = v;
+      }
     }
     // should be another object then
     else

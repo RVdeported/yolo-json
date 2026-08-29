@@ -2,6 +2,7 @@
 #include "annotations.hpp"
 #include <meta>
 #include <string>
+#include <string_view>
 
 namespace yjson
 {
@@ -11,7 +12,8 @@ namespace yjson
 template <class T>
 concept basic_json_type =
     std::integral<T> || std::floating_point<T> ||
-    std::is_same_v<T, std::string> || std::is_same_v<T, bool>;
+    std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view> ||
+    std::is_same_v<T, bool>;
 
 //--------------------------------------------------------//
 // Array types                                            //

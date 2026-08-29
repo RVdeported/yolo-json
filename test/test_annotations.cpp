@@ -108,6 +108,13 @@ struct OutOfRange
   int c;
 };
 
+// StaticSize: fixed element count on a container field (plus a plain field).
+struct StaticSized
+{
+  [[= yjson::StaticSize{7}]] std::array<int, 7> a;
+  int plain;
+};
+
 } // namespace test_types
 
 //---------------------------------------------------------------------------//
@@ -190,6 +197,20 @@ TEST(FieldAnnotationsTest, Extraction)
   EXPECT_EQ(f[4].m_sz, -1);
   EXPECT_FALSE(f[4].m_ignore);
   EXPECT_EQ(f[4].m_disp_name[0], '\0');
+}
+
+TEST(FieldAnnotationsTest, StaticSizeExtraction)
+{
+  constexpr auto f = yjson::FieldAnnots::MkFldAnnots<test_types::StaticSized>();
+  ASSERT_EQ(f.size(), 2u);
+
+  // [[= StaticSize{7}]] std::array<int, 7> a;
+  EXPECT_EQ(f[0].m_static_sz, 7);
+  EXPECT_EQ(f[0].m_sz, -1);
+  EXPECT_EQ(f[0].m_min_sz, -1);
+
+  // int plain;  (no StaticSize annotation)
+  EXPECT_EQ(f[1].m_static_sz, -1);
 }
 
 //---------------------------------------------------------------------------//

@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -26,6 +27,12 @@ struct Basic
   int i;
   double d;
   std::string s;
+};
+
+struct StringViewFld
+{
+  int i;
+  std::string_view s;
 };
 
 struct Nested
@@ -181,6 +188,21 @@ TEST(SerializerTest, RoundTripsBasicTypes)
   auto v = Parse<test_types::Basic>(json);
   EXPECT_EQ(v.i, 42);
   EXPECT_DOUBLE_EQ(v.d, 3.14);
+  EXPECT_EQ(v.s, "hello");
+}
+
+TEST(SerializerTest, RoundTripsStringViewField)
+{
+  // Serialize from a std::string_view field, then parse back into a
+  // std::string_view field (which references the serialized buffer, kept alive
+  // here across the assertions).
+  std::string json = yjson::SerializeJson<^^test_types::StringViewFld>(
+      test_types::StringViewFld{42, "hello"}, 7);
+  EXPECT_EQ(json, R"({"i":42,"s":"hello"})");
+  auto [rest, v] = yjson::ParseJson<^^test_types::StringViewFld>(
+      json.data(), json.data() + json.size());
+  (void)rest;
+  EXPECT_EQ(v.i, 42);
   EXPECT_EQ(v.s, "hello");
 }
 

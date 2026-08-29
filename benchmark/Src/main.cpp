@@ -4,8 +4,11 @@
 #include "benchmark_types.hpp"
 #include "parser.hpp"
 #include "simdjson.h"
+#include <fcntl.h>
+#include <fstream>
 #include <iostream>
 #include <serializer.hpp>
+#include <stdexcept>
 #include <string>
 #include <utxx/time_val.hpp>
 #include <vector>
@@ -34,7 +37,7 @@ template <> benchmark_types::LargeFixed GetSample()
 }
 template <> benchmark_types::LargeIgnored GetSample()
 {
-  return benchmark_types::MakeLargeIgnored(1);
+  return benchmark_types::MakeLargeIgnored();
 }
 template <> benchmark_types::LargeNotCompressed GetSample()
 {
@@ -48,13 +51,39 @@ template <> benchmark_types::LargeJust GetSample()
 {
   return benchmark_types::MakeLargeJust();
 }
+template <> benchmark_types::FixedDoubles GetSample()
+{
+  return benchmark_types::MakeFixedDoubles();
+}
+template <> benchmark_types::FixedStrings GetSample()
+{
+  return benchmark_types::MakeFixedStrings();
+}
+template <> benchmark_types::FixedPoints GetSample()
+{
+  return benchmark_types::MakeFixedPoints();
+}
+template <> benchmark_types::FixedInts GetSample()
+{
+  return benchmark_types::MakeFixedInts();
+}
+template <> benchmark_types::DynamicInts GetSample()
+{
+  return benchmark_types::MakeDynamicInts();
+}
+template <> benchmark_types::DynamicPoints GetSample()
+{
+  return benchmark_types::MakeDynamicPoints();
+}
 
 template <typename T> int RunTestOwn(std::vector<std::string> a_samples)
 {
   utxx::time_val ts = utxx::now_utc();
+  volatile long sink = 0;
   for (auto & v : a_samples)
   {
     volatile auto r = yjson::ParseJson<^^T>(v.data(), v.data() + v.size());
+    sink += static_cast<long>(*r.first);
   }
 
   return utxx::now_utc().diff_msec(ts);
@@ -101,17 +130,31 @@ template <typename T> std::pair<int, int> DoBench(int test_sz_mb)
 int main()
 {
 
-  const int test_sz_mb = 1000;
+  const int test_sz_mb = 500;
   const bool do_large = true;
   const bool do_large_not_comp = true;
   const bool do_fixed = true;
   const bool do_rand = true;
   const bool do_ignore = true;
   const bool do_just = true;
+  const bool do_fixed_arrs = true;
+  const bool do_dynamic = true;
 
   if (do_large)
   {
     (void)bench::DoBench<benchmark_types::LargeDynamic>(test_sz_mb);
+  }
+  if (do_fixed_arrs)
+  {
+    (void)bench::DoBench<benchmark_types::FixedDoubles>(test_sz_mb);
+    (void)bench::DoBench<benchmark_types::FixedStrings>(test_sz_mb);
+    (void)bench::DoBench<benchmark_types::FixedPoints>(test_sz_mb);
+    (void)bench::DoBench<benchmark_types::FixedInts>(test_sz_mb);
+  }
+  if (do_dynamic)
+  {
+    (void)bench::DoBench<benchmark_types::DynamicInts>(test_sz_mb);
+    (void)bench::DoBench<benchmark_types::DynamicPoints>(test_sz_mb);
   }
   if (do_large_not_comp)
   {

@@ -44,13 +44,52 @@ struct LargeDynamic
 {
   std::array<int, 100> ints;
   std::array<double, 100> doubles;
-  std::array<std::string, 100> strings;
+  std::array<std::string_view, 100> strings;
   std::array<Point, 100> points;              // vector of nested objects
   std::array<std::array<int, 10>, 10> matrix; // nested dynamic arrays
   int id;
-  std::string label;
+  std::string_view label;
+};
+//---------------------------------------------------------------------------//
+// Fixed arrays (StaticSize-annotated std::array)                            //
+//---------------------------------------------------------------------------//
+// Four single-field benchmarks, one per element type. Each struct holds
+// exactly one fixed array and nothing else, so each measurement isolates the
+// unrolled StaticSize parser path for that element type.
+struct FixedDoubles
+{
+  [[= yjson::StaticSize{100}]] std::array<double, 100> doubles;
 };
 
+struct FixedStrings
+{
+  [[= yjson::StaticSize{100}]] std::array<std::string, 100> strings;
+};
+
+struct FixedPoints
+{
+  [[= yjson::StaticSize{100}]] std::array<Point, 100> points;
+};
+
+struct FixedInts
+{
+  [[= yjson::StaticSize{100}]] std::array<int, 100> ints;
+};
+//---------------------------------------------------------------------------//
+// Dynamic containers (StaticSize-annotated std::vector)                     //
+//---------------------------------------------------------------------------//
+// Dynamic (std::vector) counterparts of the fixed-array benchmarks above:
+// StaticSize still gives the parser a compile-time element count, so the
+// vector is reserved once and parsed by the same unrolled loop.
+struct DynamicInts
+{
+  [[= yjson::StaticSize{100}]] std::vector<int> ints;
+};
+
+struct DynamicPoints
+{
+  [[= yjson::StaticSize{100}]] std::vector<Point> points;
+};
 //---------------------------------------------------------------------------//
 // (2) Large JSON, NotCompressed (whitespace emitted / tolerated)            //
 //---------------------------------------------------------------------------//
@@ -64,12 +103,8 @@ struct[[= yjson::NotCompressed{}]] LargeNotCompressed
   double d1;
   double d2;
   double d3;
-  std::string s0;
-  std::string s1;
   bool b0;
   bool b1;
-  std::vector<int> nums;
-  std::vector<Point> pts;
   Point origin;
 };
 
@@ -115,9 +150,8 @@ struct LargeIgnored
   [[= yjson::Ignore{}]] int skip_18;
   [[= yjson::Ignore{}]] int skip_19;
   int id;
+  std::array<double, 10> nums;
   double value;
-  std::string name;
-  std::vector<int> nums;
   Point origin;
 };
 
@@ -145,7 +179,6 @@ struct LargeJust
   int skip_19;
   int id;
   double value;
-  std::string name;
   Point origin;
 };
 
@@ -174,10 +207,8 @@ struct[[= yjson::RandomOrder{}]] LargeRandomOrder
   int f17;
   int f18;
   int f19;
-  std::string name;
   bool flag;
   double ratio;
-  std::vector<int> nums;
 };
 
 //===========================================================================//
@@ -208,6 +239,58 @@ inline LargeDynamic MakeLargeDynamic(int n)
   return v;
 }
 
+inline FixedDoubles MakeFixedDoubles()
+{
+  FixedDoubles v{};
+  for (std::size_t i = 0; i < v.doubles.size(); ++i)
+    v.doubles[i] = static_cast<double>(i) * 0.5;
+  return v;
+}
+
+inline FixedStrings MakeFixedStrings()
+{
+  FixedStrings v{};
+  for (std::size_t i = 0; i < v.strings.size(); ++i)
+    v.strings[i] = "item_" + std::to_string(i);
+  return v;
+}
+
+inline FixedPoints MakeFixedPoints()
+{
+  FixedPoints v{};
+  for (std::size_t i = 0; i < v.points.size(); ++i)
+    v.points[i] = Point{static_cast<double>(i), static_cast<double>(i) + 0.5,
+                        static_cast<double>(i) + 1.0};
+  return v;
+}
+
+inline FixedInts MakeFixedInts()
+{
+  FixedInts v{};
+  for (std::size_t i = 0; i < v.ints.size(); ++i)
+    v.ints[i] = static_cast<int>(i % 1000);
+  return v;
+}
+
+inline DynamicInts MakeDynamicInts()
+{
+  DynamicInts v{};
+  v.ints.resize(100);
+  for (std::size_t i = 0; i < v.ints.size(); ++i)
+    v.ints[i] = static_cast<int>(i % 1000);
+  return v;
+}
+
+inline DynamicPoints MakeDynamicPoints()
+{
+  DynamicPoints v{};
+  v.points.resize(100);
+  for (std::size_t i = 0; i < v.points.size(); ++i)
+    v.points[i] = Point{static_cast<double>(i), static_cast<double>(i) + 0.5,
+                        static_cast<double>(i) + 1.0};
+  return v;
+}
+
 inline LargeNotCompressed MakeLargeNotCompressed(std::size_t n)
 {
   LargeNotCompressed v;
@@ -219,17 +302,14 @@ inline LargeNotCompressed MakeLargeNotCompressed(std::size_t n)
   v.d1 = 1.5;
   v.d2 = 2.5;
   v.d3 = 3.5;
-  v.s0 = "alpha";
-  v.s1 = "beta gamma delta";
   v.b0 = true;
   v.b1 = false;
-  v.nums.resize(n);
   const std::size_t m = n / 10;
-  v.pts.resize(m);
-  for (std::size_t i = 0; i < n; ++i)
-    v.nums[i] = static_cast<int>(i);
-  for (std::size_t i = 0; i < m; ++i)
-    v.pts[i] = Point{static_cast<double>(i), -static_cast<double>(i), 0.0};
+  // v.pts.resize(m);
+  // for (std::size_t i = 0; i < n; ++i)
+  //   v.nums[i] = static_cast<int>(i);
+  // for (std::size_t i = 0; i < m; ++i)
+  //   v.pts[i] = Point{static_cast<double>(i), -static_cast<double>(i), 0.0};
   v.origin = Point{1.0, 2.0, 3.0};
   return v;
 }
@@ -252,7 +332,7 @@ inline LargeFixed MakeLargeFixed()
   return v;
 }
 
-inline LargeIgnored MakeLargeIgnored(std::size_t n)
+inline LargeIgnored MakeLargeIgnored()
 {
   LargeIgnored v{};
   // Fill the ignored fields too: the serializer emits them, the parser skips
@@ -279,9 +359,7 @@ inline LargeIgnored MakeLargeIgnored(std::size_t n)
   v.skip_19 = 119;
   v.id = 4242;
   v.value = 6.25;
-  v.name = "many_ignored";
-  v.nums.resize(n);
-  for (std::size_t i = 0; i < n; ++i)
+  for (std::size_t i = 0; i < 10; ++i)
     v.nums[i] = static_cast<int>(i % 64);
   v.origin = Point{9.0, 8.0, 7.0};
   return v;
@@ -314,7 +392,6 @@ inline LargeJust MakeLargeJust()
   v.skip_19 = 119;
   v.id = 4242;
   v.value = 6.25;
-  v.name = "many_ignored";
   v.origin = Point{9.0, 8.0, 7.0};
   return v;
 }
@@ -342,12 +419,11 @@ inline LargeRandomOrder MakeLargeRandomOrder(std::size_t n)
   v.f17 = 17;
   v.f18 = 18;
   v.f19 = 19;
-  v.name = "random_order";
   v.flag = true;
   v.ratio = 3.75;
-  v.nums.resize(n);
-  for (std::size_t i = 0; i < n; ++i)
-    v.nums[i] = static_cast<int>(i);
+  // v.nums.resize(n);
+  // for (std::size_t i = 0; i < n; ++i)
+  //   v.nums[i] = static_cast<int>(i);
   return v;
 }
 

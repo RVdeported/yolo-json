@@ -144,6 +144,14 @@ struct MinSize
   int _Sz;
 };
 
+// Marks a container as holding a fixed, compile-time-known number of elements.
+// Triggers the fully-unrolled ParseContainerStatic parser (template-for loop,
+// compile-time delimiters, single up-front allocation).
+struct StaticSize
+{
+  int _Sz;
+};
+
 struct FieldAnnots
 {
   int m_pos = -1;
@@ -151,6 +159,7 @@ struct FieldAnnots
   bool m_ignore = false;
   std::array<char, DisplayName::kMaxLen + 1> m_disp_name{};
   int m_min_sz = -1;
+  int m_static_sz = -1;
   bool m_may_absent = false;
 
   template <std::meta::info fld> static consteval FieldAnnots MkFieldAnnots()
@@ -167,6 +176,12 @@ struct FieldAnnots
                   sz.size() > 0)
     {
       ann.m_sz = std::meta::extract<Size>(sz[0])._Sz;
+    }
+
+    if constexpr (constexpr auto st_sz = get_annotations<StaticSize, fld>();
+                  st_sz.size() > 0)
+    {
+      ann.m_static_sz = std::meta::extract<StaticSize>(st_sz[0])._Sz;
     }
 
     if constexpr (get_annotations<Ignore, fld>().size() > 0)
@@ -322,8 +337,8 @@ template <std::meta::info T> consteval bool IsContainer()
   {
     return false;
   }
-  else if constexpr (std::meta::has_template_arguments(T)
-                     && std::meta::template_of(T) == ^^std::array)
+  else if constexpr (std::meta::has_template_arguments(T) &&
+                     std::meta::template_of(T) == ^^std::array)
   {
     // Fixed-size containers (std::array) lack push_back/emplace_back, so the
     // dynamic-container probe below would miss them.
@@ -365,19 +380,16 @@ template <std::meta::info T> consteval bool IsOption()
   }
 }
 
-consteval bool IsBool(std::meta::info T)
-{
-  return T == ^^bool;
-}
+consteval bool IsBool(std::meta::info T) { return T == ^^bool; }
 
 consteval bool IsTuple(std::meta::info T)
 {
   try
   {
-    return std::meta::template_of(T) == ^^std::tuple
-        || std::meta::template_of(T) == ^^std::pair;
+    return std::meta::template_of(T) == ^^std::tuple ||
+           std::meta::template_of(T) == ^^std::pair;
   }
-  catch(...)
+  catch (...)
   {
     return false;
   }
@@ -393,18 +405,18 @@ template <std::meta::info T, bool top_lvl> consteval bool IsBase()
   {
     constexpr bool integral = std::meta::is_integral_type(T);
     constexpr bool floating = std::meta::is_floating_point_type(T);
-    constexpr bool boolean  = IsBool(T);
+    constexpr bool boolean = IsBool(T);
     constexpr bool stringal = T == ^^std::string;
     constexpr bool string11 = T == ^^std::__cxx11::basic_string<char>;
-    return integral || floating || stringal || string11 || boolean;
+    constexpr bool stringview = T == ^^std::string_view;
+    constexpr bool stringview11 = T == ^^std::basic_string_view<char>;
+    return integral || floating || stringal || string11 || stringview ||
+           stringview11 || boolean;
   }
 }
-template <std::meta::info T>
-consteval bool IsSupported()
+template <std::meta::info T> consteval bool IsSupported()
 {
   return std::is_copy_assignable<typename[:T:]>();
 }
-
-
 
 } // namespace yjson

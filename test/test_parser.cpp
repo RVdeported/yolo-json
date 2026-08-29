@@ -11,6 +11,7 @@
 #include <deque>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -26,6 +27,18 @@ struct Basic
   int i;
   double d;
   std::string s;
+};
+
+struct StringViewFld
+{
+  int i;
+  std::string_view s;
+};
+
+struct VectorOfStringViews
+{
+  std::vector<std::string_view> v;
+  int rest;
 };
 
 struct Signed
@@ -395,6 +408,53 @@ struct VectorOptional
   std::optional<std::vector<int>> a;
   int rest;
 };
+
+//---------------------------------------------------------------------------//
+// StaticSize (fixed element count) containers:                              //
+//---------------------------------------------------------------------------//
+
+// A dynamic container whose element count is annotated at compile time.
+struct StaticVectorOfInts
+{
+  [[= yjson::StaticSize{3}]] std::vector<int> v;
+  int rest;
+};
+
+// StaticSize on a container of strings (exercises the string delimiter path).
+struct StaticVectorOfStrings
+{
+  [[= yjson::StaticSize{2}]] std::vector<std::string> v;
+  int rest;
+};
+
+// StaticSize on a container of nested objects.
+struct StaticVectorOfObjs
+{
+  [[= yjson::StaticSize{2}]] std::vector<Leaf> v;
+  int rest;
+};
+
+// StaticSize matching a std::array's own element count (unrolled fixed path).
+struct StaticArrayOfInts
+{
+  [[= yjson::StaticSize{3}]] std::array<int, 3> a;
+  int rest;
+};
+
+// StaticSize on a std::deque (no reserve() -> emplace_back growth path).
+struct StaticDequeOfInts
+{
+  [[= yjson::StaticSize{2}]] std::deque<int> d;
+  int rest;
+};
+
+// StaticSize inside a RandomOrder object (annotation must survive key-matching).
+struct[[= yjson::RandomOrder{}]] RandomStaticVector
+{
+  [[= yjson::StaticSize{2}]] std::vector<int> v;
+  int rest;
+};
+
 } // namespace test_types
 
 //---------------------------------------------------------------------------//
@@ -424,6 +484,33 @@ TEST(ParseJsonTest, ParsesBasicTypes)
   EXPECT_EQ(v.i, 42);
   EXPECT_DOUBLE_EQ(v.d, 3.14);
   EXPECT_EQ(v.s, "hello");
+}
+
+// std::string_view references the input buffer, so the buffer must stay alive
+// across the check (the Parse<T> helper would dangle the view by returning by
+// value). Parse directly and keep the JSON string in scope.
+TEST(ParseJsonTest, ParsesStringViewField)
+{
+  std::string json = R"({"i":7,"s":"hello"})";
+  auto [rest, v] = yjson::ParseJson<^^test_types::StringViewFld>(
+      json.data(), json.data() + json.size());
+  (void)rest;
+  EXPECT_EQ(v.i, 7);
+  EXPECT_EQ(v.s, "hello");
+}
+
+// string_view elements inside a dynamic container (exercises the
+// container -> element -> base-string dispatch path).
+TEST(ParseJsonTest, ParsesVectorOfStringViews)
+{
+  std::string json = R"({"v":["a","bb"],"rest":3})";
+  auto [rest, v] = yjson::ParseJson<^^test_types::VectorOfStringViews>(
+      json.data(), json.data() + json.size());
+  (void)rest;
+  ASSERT_EQ(v.v.size(), 2u);
+  EXPECT_EQ(v.v[0], "a");
+  EXPECT_EQ(v.v[1], "bb");
+  EXPECT_EQ(v.rest, 3);
 }
 
 TEST(ParseJsonTest, ParsesNegativeNumbers)
@@ -989,6 +1076,55 @@ TEST(ParseJsonTest, ParsesNotFullArray)
   auto v = Parse<test_types::ArrayOfInts>(
       R"({"a":[1],"rest":9})");
   EXPECT_EQ(v.a, (std::array<int,3>{1,0,0}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+//---------------------------------------------------------------------------//
+// StaticSize (fixed element count) containers:                              //
+//---------------------------------------------------------------------------//
+TEST(ParseJsonTest, ParsesStaticSizeVectorOfInts)
+{
+  auto v = Parse<test_types::StaticVectorOfInts>(R"({"v":[1,2,3],"rest":9})");
+  EXPECT_EQ(v.v, (std::vector<int>{1, 2, 3}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesStaticSizeVectorOfStrings)
+{
+  auto v = Parse<test_types::StaticVectorOfStrings>(R"({"v":["a","b"],"rest":9})");
+  EXPECT_EQ(v.v, (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesStaticSizeVectorOfObjects)
+{
+  auto v =
+      Parse<test_types::StaticVectorOfObjs>(R"({"v":[{"v":1},{"v":2}],"rest":9})");
+  ASSERT_EQ(v.v.size(), 2u);
+  EXPECT_EQ(v.v[0].v, 1);
+  EXPECT_EQ(v.v[1].v, 2);
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesStaticSizeArrayOfInts)
+{
+  auto v = Parse<test_types::StaticArrayOfInts>(R"({"a":[4,5,6],"rest":9})");
+  EXPECT_EQ(v.a, (std::array<int, 3>{4, 5, 6}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesStaticSizeDequeOfInts)
+{
+  auto v = Parse<test_types::StaticDequeOfInts>(R"({"d":[7,8],"rest":9})");
+  EXPECT_EQ(v.d, (std::deque<int>{7, 8}));
+  EXPECT_EQ(v.rest, 9);
+}
+
+TEST(ParseJsonTest, ParsesStaticSizeInRandomOrderObject)
+{
+  auto v =
+      Parse<test_types::RandomStaticVector>(R"({"rest":9,"v":[7,8]})");
+  EXPECT_EQ(v.v, (std::vector<int>{7, 8}));
   EXPECT_EQ(v.rest, 9);
 }
 
