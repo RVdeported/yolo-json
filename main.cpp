@@ -12,9 +12,10 @@
 #include <ranges>
 #include <type_traits>
 #include <vector>
-#include <cassert>
 
-struct [[= yjson::NotCompressed{}]] B
+#include "Include/serializer.hpp"
+#include "benchmark/Src/benchmark_types.hpp"
+struct[[= yjson::NotCompressed{}]] B
 {
   int d = 10;
 };
@@ -108,39 +109,16 @@ template <typename T> void print_(T & A, std::ostream & stream)
 struct Opt
 {
   [[= yjson::MayAbsent{}]] std::optional<int> opt;
-  std::array<int,2> tp;
+  std::array<int, 2> tp;
   [[= yjson::DisplayName{"test"}]] int rest;
 };
 int main()
 {
-  // static_assert(yjson::IsOption<^^std::optional<int>>());
-  // static_assert(yjson::IsBase<^^std::string>());
-  // std::string test = "{  \"c\"  :  34 , \"a\"  : 31   ,  \"ss\":\"test\", \"bb\" : { \"d\" : 99 } }";
-  //
-  // auto [rest, a] =
-  //     yjson::ParseJson<^^A>(test.data(), test.data() + test.size());
-  //
-  // std::cout << a.c << "|" << a.a.value_or(0) << "|" << a.ss << "|" << a.bb.d << '\n';
-
-  char buf[] = R"({"opt":23,"tp":[1,4],"test":9})";
-  auto [rest, v] =
-      yjson::ParseJson<^^Opt>(buf, buf + std::strlen(buf));
-  (void)rest;
-   std::cout << sizeof(v.tp) << '\n';
-  
-   static_assert(std::is_copy_assignable_v<std::string>);
-   static_assert(std::is_copy_assignable_v<std::vector<int>>);
-   static_assert(!std::is_copy_assignable_v<int[6]>);
-  // template for (constexpr auto v : ss)
-  // {
-  //   // if constexpr (std::meta::has_identifier(v))
-  //   {
-  //     // std::cout << name << '\n';
-  //     // std::cout << [:v:].data << '\n';
-  //
-  //     // constexpr bool aaa = (std::meta::type_of(v) ==
-  //     //                       std::meta::type_of(^^yjson::CompTimeStr<5>));
-  //   }
-  // }
+  // char buf[] = R"({"opt":23,"tp":[1,4],"test":9})";
+  // auto [rest, v] = yjson::ParseJson<^^Opt>(buf, buf + std::strlen(buf));
+  // auto json = ::yjson::SerializeJson<^^Opt>(Opt{4, {1, 2}, 30}, 1);
+  // std::cout << json << '\n';
+  auto Lg = benchmark_types::MakeLargeFixed();
+  std::cout << Lg.zero_padded3 << '\n';
   return 0;
 }

@@ -5,9 +5,11 @@
 #pragma once
 
 #include "Include/annotations.hpp"
+#include "Include/parser.hpp"
 #include "Include/utils.hpp"
 
 #include <algorithm>
+#include <array>
 #include <format>
 #include <meta>
 #include <random>
@@ -24,11 +26,12 @@ namespace yjson
 // Serializes reflection-described structs into JSON, mirroring the parser in
 // Include/parser.hpp. It reuses the same compile-time utilities (StructAnnots,
 // FieldAnnots, GetOrderedField, ...) so ordering, renaming, skipping and
-// sizing annotations are honoured. For the two "random" annotations the
+// sizing annotations are honoured. For the three "random" annotations the
 // effect is faked with a random number generator:
 //
 //   * MayAbsent     -> the field is randomly omitted (may_absent_prob);
-//   * NotCompressed -> whitespace is emitted at random (0-3 spaces).
+//   * NotCompressed -> whitespace is emitted at random (0-3 spaces);
+//   * RandomOrder   -> the fields are emitted in a shuffled order.
 class JsonSerializer
 {
 public:
@@ -182,6 +185,46 @@ private:
     out += ']';
   }
 
+  // Emit a single object field (key + value) and update @a emitted. MayAbsent
+  // fields are randomly dropped by consuming the RNG, mirroring the parser's
+  // expectation that they may simply be absent.
+  template <std::meta::info T, std::meta::info curr_fld, bool Compressed>
+  void EmitField(const typename[:T:] & value, std::string & out, bool & emitted)
+  {
+    constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
+
+    // MayAbsent: randomly drop the field to simulate absence.
+    if constexpr (curr_ann.m_may_absent)
+    {
+      if (std::bernoulli_distribution(may_absent_prob_)(rng_))
+        return;
+    }
+
+    constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
+    const std::string_view name =
+        curr_ann.m_disp_name[0] == '\0'
+            ? ident
+            : std::string_view(curr_ann.m_disp_name.data());
+
+    if (emitted)
+    {
+      out += ',';
+      MaybeSpaces<Compressed>(out);
+    }
+    emitted = true;
+
+    out += '"';
+    out += name;
+    out += '"';
+    MaybeSpaces<Compressed>(out);
+    out += ':';
+    MaybeSpaces<Compressed>(out);
+
+    constexpr auto t = std::meta::type_of(curr_fld);
+    const int width = std::max({0, curr_ann.m_sz, curr_ann.m_min_sz});
+    SerializeVal<t, Compressed>(value.[:curr_fld:], out, width);
+  }
+
   template <std::meta::info T>
   void SerializeObject(const typename[:T:] & value, std::string & out)
   {
@@ -197,41 +240,31 @@ private:
 
     bool emitted = false;
 
-    template for (constexpr auto idx : std::views::indices(sz))
+    if constexpr (strAnnots.m_random_order)
     {
-      constexpr auto curr_fld = flds[flds_ord[idx]];
-      constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
+      // RandomOrder: emit fields in a runtime-shuffled order (deterministic
+      // for a fixed seed). Each field still needs a compile-time reflection
+      // handle, so loop over runtime positions and dispatch to the matching
+      // field via a compile-time scan.
+      std::array<int, sz> order = flds_ord;
+      std::shuffle(order.begin(), order.end(), rng_);
 
-      // MayAbsent: randomly drop the field to simulate absence.
-      if constexpr (curr_ann.m_may_absent)
+      for (std::size_t pos = 0; pos < sz; ++pos)
       {
-        if (std::bernoulli_distribution(may_absent_prob_)(rng_))
-          continue;
+        template for (constexpr auto i : std::views::indices(sz))
+        {
+          if (order[pos] == static_cast<int>(i))
+            EmitField<T, flds[i], compressed>(value, out, emitted);
+        }
       }
-
-      constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
-      const std::string_view name =
-          curr_ann.m_disp_name[0] == '\0'
-              ? ident
-              : std::string_view(curr_ann.m_disp_name.data());
-
-      if (emitted)
+    }
+    else
+    {
+      template for (constexpr auto idx : std::views::indices(sz))
       {
-        out += ',';
-        MaybeSpaces<compressed>(out);
+        constexpr auto curr_fld = flds[flds_ord[idx]];
+        EmitField<T, curr_fld, compressed>(value, out, emitted);
       }
-      emitted = true;
-
-      out += '"';
-      out += name;
-      out += '"';
-      MaybeSpaces<compressed>(out);
-      out += ':';
-      MaybeSpaces<compressed>(out);
-
-      constexpr auto t = std::meta::type_of(curr_fld);
-      const int width = std::max({0, curr_ann.m_sz, curr_ann.m_min_sz});
-      SerializeVal<t, compressed>(value.[:curr_fld:], out, width);
     }
 
     MaybeSpaces<compressed>(out);

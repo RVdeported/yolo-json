@@ -61,7 +61,7 @@
 //               if true                                                     //
 //---------------------------------------------------------------------------//
 #define SKP_IF_STR_G(Str)                                                      \
-  (std::strncmp(curr + 1, Str, sizeof(Str) - 1) == 0 &&                          \
+  (std::strncmp(curr + 1, Str, sizeof(Str) - 1) == 0 &&                        \
    (curr += sizeof(Str) + 1, true))
 
 #define SKP_IF_STR_U(Str) UNLIKELY(SKP_IF_STR_G(Str))
@@ -69,7 +69,7 @@
 #define SKP_IF_STR(Str) SKP_IF_STR_L(Str)
 
 #define SKP_IF_SV_G(Sv)                                                        \
-  (std::memcmp(Sv.data(), curr + 1, Sv.size()) == 0 &&                           \
+  (std::memcmp(Sv.data(), curr + 1, Sv.size()) == 0 &&                         \
    (curr += Sv.size() + 2, true))
 
 #define SKP_IF_SV_U(Sv) UNLIKELY(SKP_IF_SV_G(Sv))

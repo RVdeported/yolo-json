@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Include/annotations.hpp"
 #include "Include/json_parser.hpp"
 #include "Include/utils.hpp"
@@ -92,9 +94,9 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
   constexpr bool integral = std::meta::is_integral_type(T);
   constexpr bool floating = std::meta::is_floating_point_type(T);
-  
+
   char Delim = Delim1;
-  if constexpr(Delim1 != Delim2)
+  if constexpr (Delim1 != Delim2)
   {
     char const * from = curr;
     char const * d1 = std::find(from, end, Delim1);
@@ -161,9 +163,8 @@ struct ObjectParser
         constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
 
         constexpr char delim = idx + 1 == sz ? '}' : ',';
-        auto [after, v] =
-            ParseObj<curr_fld, curr_ann.m_sz, curr_ann.m_min_sz,  strAnnots.m_compressed,
-          delim>(curr, end);
+        auto [after, v] = ParseObj<curr_fld, curr_ann.m_sz, curr_ann.m_min_sz,
+                                   strAnnots.m_compressed, delim>(curr, end);
         curr = after;
 
         out.[:curr_fld:] = v;
@@ -223,12 +224,12 @@ struct ObjectParser
               std::string_view(curr_ann.m_disp_name.begin());
           std::string_view name =
               curr_ann.m_disp_name[0] == '\0' ? ident : disp_name;
-          
+
           char * after = curr;
           SKP_IF_SV_G(name);
           if (after == curr)
             continue;
-          
+
           matched = true;
           parsed[i] = true;
 
@@ -265,27 +266,29 @@ struct ObjectParser
     return {curr, out};
   }
 
-  template<std::meta::info T, bool Compressed = true> 
+  template <std::meta::info T, bool Compressed = true>
   static std::pair<char *, typename[:T:]> ParseTuple(char * curr, char * end)
   {
     static_assert(IsTuple(T));
     assert(curr && end);
     assert(*curr == '[');
-    constexpr auto types = std::define_static_array(std::meta::template_arguments_of(T));
-    constexpr auto sz = types.size(); 
-    
+    constexpr auto types =
+        std::define_static_array(std::meta::template_arguments_of(T));
+    constexpr auto sz = types.size();
+
     typename[:T:] out;
     template for (constexpr auto idx : std::views::indices(sz))
     {
       constexpr auto tt = types[idx];
-      if constexpr(idx > 0)
+      if constexpr (idx > 0)
         assert(*curr == ',');
 
       curr++;
-      if constexpr(!Compressed)
+      if constexpr (!Compressed)
         SKP_SPC();
 
-      auto [after, v] = ParseVal<tt, 0, -1, Compressed, idx == sz - 1 ? ']' : ','>(curr, end);
+      auto [after, v] =
+          ParseVal<tt, 0, -1, Compressed, idx == sz - 1 ? ']' : ','>(curr, end);
 
       std::get<idx>(out) = v;
       curr = after;
@@ -295,8 +298,9 @@ struct ObjectParser
     return {curr, out};
   }
 
-  template<std::meta::info T, bool Compressed = true> 
-  static std::pair<char *, typename[:T:]> ParseContainer(char * curr, char * end)
+  template <std::meta::info T, bool Compressed = true>
+  static std::pair<char *, typename[:T:]> ParseContainer(char * curr,
+                                                         char * end)
   {
     static_assert(IsContainer<T>());
     assert(curr && end);
@@ -305,28 +309,38 @@ struct ObjectParser
     constexpr bool fixed = std::meta::template_of(T) == ^^std::array;
 
     typename[:T:] out;
-    
-    if (*(curr + 1) == ']')
-      return {curr + 2, out};
 
-    for (auto idx :
-         std::views::indices(fixed ? int(out.size())
-                                   : std::numeric_limits<int>::max()))
+    // Empty container: skip '[' and any surrounding whitespace (NotCompressed
+    // emits spaces inside an empty container), then expect ']'.
+    {
+      char * probe = curr + 1;
+      if constexpr (!Compressed)
+        while (isspace(*probe) || *probe == '\n' || *probe == '\t')
+          ++probe;
+      if (*probe == ']')
+        return {probe + 1, out};
+    }
+
+    for (auto idx : std::views::indices(
+             fixed ? int(out.size()) : std::numeric_limits<int>::max()))
     {
       assert(idx == 0 || *curr == ',');
       curr++;
 
-      if constexpr(!Compressed)
+      if constexpr (!Compressed)
         SKP_SPC();
 
-      auto [after, v] = ParseVal<tt, 0, -1, Compressed, ',', false, ']'>(curr, end);
+      auto [after, v] =
+          ParseVal<tt, 0, -1, Compressed, ',', false, ']'>(curr, end);
 
       if constexpr (fixed)
         out[idx] = v;
       else
         out.emplace_back(v);
       curr = after;
-      
+      if constexpr (!Compressed)
+        SKP_SPC();
+
       if (*curr == ']')
         break;
     }
@@ -335,24 +349,21 @@ struct ObjectParser
     return {curr, out};
   }
 
-
   // Parse a single field of the object being parsed. `curr` points at the
   // field's key; the returned pointer points at the delimiter following the
   // value (or at the re-wound key when an optional field is absent).
-  template <std::meta::info curr_fld, int sz, int min_sz,
-            bool compressed, char Delim>
-  static std::pair<char *, typename[:std::meta::type_of(curr_fld):]> 
+  template <std::meta::info curr_fld, int sz, int min_sz, bool compressed,
+            char Delim>
+  static std::pair<char *, typename[:std::meta::type_of(curr_fld):]>
   ParseObj(char * curr, char * end)
   {
     constexpr auto t = std::meta::type_of(curr_fld);
     constexpr FieldAnnots curr_ann = FieldAnnots::MkFieldAnnots<curr_fld>();
     constexpr std::string_view ident = std::meta::identifier_of(curr_fld);
-    
-    typename [:t:] out;
-    std::string_view disp_name =
-        std::string_view(curr_ann.m_disp_name.begin());
-    std::string_view name =
-        curr_ann.m_disp_name[0] == '\0' ? ident : disp_name;
+
+    typename[:t:] out;
+    std::string_view disp_name = std::string_view(curr_ann.m_disp_name.begin());
+    std::string_view name = curr_ann.m_disp_name[0] == '\0' ? ident : disp_name;
 
     constexpr auto base_cls = std::meta::has_template_arguments(t)
                                   ? std::meta::template_arguments_of(t)[0]
@@ -392,28 +403,27 @@ struct ObjectParser
 
     if constexpr (!compressed)
       SKP_SPC();
-    
-    auto [after, v] = ParseVal<t, sz, min_sz, compressed, Delim, curr_ann.m_ignore>(curr, end);
+
+    auto [after, v] =
+        ParseVal<t, sz, min_sz, compressed, Delim, curr_ann.m_ignore>(curr,
+                                                                      end);
 
     return {after, v};
   }
 
-  template <std::meta::info T, int sz, int min_sz,
-            bool compressed, char Delim1, bool ignore = false, char Delim2 = Delim1>
-  static std::pair<char *, typename[:T:]> ParseVal(char * curr,
-                                                          char * end)
+  template <std::meta::info T, int sz, int min_sz, bool compressed, char Delim1,
+            bool ignore = false, char Delim2 = Delim1>
+  static std::pair<char *, typename[:T:]> ParseVal(char * curr, char * end)
   {
     static_assert(IsSupported<T>());
-    typename [:T:] out;
+    typename[:T:] out;
     // constexpr auto base_cls = std::meta::has_template_arguments(T)
     //                               ? std::meta::template_arguments_of(T)[0]
     //                               : T;
-    constexpr auto base_cls = IsOption<T>() 
-      ? std::meta::template_arguments_of(T)[0]
-      : T;
+    constexpr auto base_cls =
+        IsOption<T>() ? std::meta::template_arguments_of(T)[0] : T;
     static_assert(!std::meta::is_array_type(T));
     static_assert(!std::meta::is_array_type(base_cls));
-
 
     if constexpr (IsOption<T>())
     {
@@ -454,10 +464,8 @@ struct ObjectParser
     }
     else if constexpr (IsBase<T>())
     {
-      auto [after, v] =
-          ParseBase<base_cls == ^^char ? T : base_cls, Delim1,
-                    ignore, min_sz, sz, Delim2>(
-              curr, end);
+      auto [after, v] = ParseBase<base_cls == ^^char ? T : base_cls, Delim1,
+                                  ignore, min_sz, sz, Delim2>(curr, end);
       curr = after;
       out = v;
 
@@ -496,8 +504,5 @@ std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
 {
   return detail::ObjectParser::ParseJson<T>(curr, end);
 }
-
-
-
 
 } // namespace yjson

@@ -10,6 +10,7 @@
 #include <array>
 #include <cstring>
 #include <optional>
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -93,6 +94,15 @@ struct Sized
 {
   [[= yjson::Size{5}]] int fixed;
   int after;
+};
+
+struct[[= yjson::RandomOrder{}]] Shuffled
+{
+  int a;
+  int b;
+  int c;
+  int d;
+  int e;
 };
 
 } // namespace test_types
@@ -302,4 +312,35 @@ TEST(SerializerTest, MayAbsentUsesRandomness)
   }
   EXPECT_TRUE(saw_present);
   EXPECT_TRUE(saw_absent);
+}
+
+//---------------------------------------------------------------------------//
+// RandomOrder (shuffled field order on serialize):                          //
+//---------------------------------------------------------------------------//
+TEST(SerializerTest, RandomOrderShufflesFieldOrder)
+{
+  test_types::Shuffled v{1, 2, 3, 4, 5};
+  std::set<std::string> seen;
+  for (unsigned seed = 0; seed < 64; ++seed)
+  {
+    auto json = yjson::SerializeJson<^^test_types::Shuffled>(v, seed);
+    seen.insert(json);
+    // Regardless of field order, the output must round-trip.
+    auto r = Parse<test_types::Shuffled>(json);
+    EXPECT_EQ(r.a, 1);
+    EXPECT_EQ(r.b, 2);
+    EXPECT_EQ(r.c, 3);
+    EXPECT_EQ(r.d, 4);
+    EXPECT_EQ(r.e, 5);
+  }
+  EXPECT_GT(seen.size(), 1u); // field order actually varies across seeds
+}
+
+TEST(SerializerTest, RandomOrderIsDeterministicForFixedSeed)
+{
+  auto j1 = yjson::SerializeJson<^^test_types::Shuffled>(
+      test_types::Shuffled{1, 2, 3, 4, 5}, 42);
+  auto j2 = yjson::SerializeJson<^^test_types::Shuffled>(
+      test_types::Shuffled{1, 2, 3, 4, 5}, 42);
+  EXPECT_EQ(j1, j2);
 }

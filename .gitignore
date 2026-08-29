@@ -1,2 +1,3 @@
 build/
 *.json
+benchmark/Src/simdjson.*
