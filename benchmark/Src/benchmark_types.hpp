@@ -63,7 +63,7 @@ struct FixedDoubles
 
 struct FixedStrings
 {
-  [[= yjson::StaticSize{100}]] std::array<std::string, 100> strings;
+  [[= yjson::StaticSize{100}]] std::array<std::string_view, 100> strings;
 };
 
 struct FixedPoints
@@ -251,7 +251,10 @@ inline FixedStrings MakeFixedStrings()
 {
   FixedStrings v{};
   for (std::size_t i = 0; i < v.strings.size(); ++i)
-    v.strings[i] = "item_" + std::to_string(i);
+  {
+    std::string * str = new std::string("item_" + std::to_string(i));
+    v.strings[i] = *str;
+  }
   return v;
 }
 
