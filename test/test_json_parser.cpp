@@ -63,16 +63,15 @@ TEST(JsonParserTest, ReadDouble)
 TEST(JsonParserTest, ReadNumber)
 {
   char i[] = "123  ,erte5t3";
-  auto [val, next] = JSONParser::ReadNumber<int>(i, i + 7, ',', 3);
+  auto [val, next] = JSONParser::ReadNumber<int>(i, ',', 3);
   EXPECT_EQ(val, 123);
   EXPECT_EQ(*next, ',');
 
   char d[] = "3.14  ,45tert";
-  EXPECT_DOUBLE_EQ(JSONParser::ReadNumber<double>(d, d + 7, ',', 2).first,
-                   3.14);
+  EXPECT_DOUBLE_EQ(JSONParser::ReadNumber<double>(d, ',', 2).first, 3.14);
   //
   char neg[] = "-7|452wtrt";
-  EXPECT_EQ(JSONParser::ReadNumber<int>(neg, neg + 7, '|').first, -7);
+  EXPECT_EQ(JSONParser::ReadNumber<int>(neg, '|').first, -7);
 }
 
 //---------------------------------------------------------------------------//
@@ -226,7 +225,7 @@ TEST(JsonParserTest, GetStrEmpty)
 TEST(JsonParserTest, SkipValInt)
 {
   char msg[] = "123,45";
-  char * v = JSONParser::SkipVal<int>(msg, msg + 6, ',');
+  char * v = JSONParser::SkipVal<int>(msg, ',');
   EXPECT_EQ(v, msg + 3);
   EXPECT_EQ(*v, ',');
 }
@@ -237,7 +236,7 @@ TEST(JsonParserTest, SkipValInt)
 TEST(JsonParserTest, SkipValDouble)
 {
   char msg[] = "3.14}rest";
-  char * v = JSONParser::SkipVal<double>(msg, msg + 7, '}');
+  char * v = JSONParser::SkipVal<double>(msg, '}');
   EXPECT_EQ(v, msg + 4);
   EXPECT_EQ(*v, '}');
 }
@@ -248,7 +247,7 @@ TEST(JsonParserTest, SkipValDouble)
 TEST(JsonParserTest, SkipValNegativeInt)
 {
   char msg[] = "-42   |xx";
-  char * v = JSONParser::SkipVal<int>(msg, msg + 8, '|');
+  char * v = JSONParser::SkipVal<int>(msg, '|');
   EXPECT_EQ(v, msg + 6);
   EXPECT_EQ(*v, '|');
 }
@@ -260,7 +259,7 @@ TEST(JsonParserTest, SkipValNegativeInt)
 TEST(JsonParserTest, SkipValString)
 {
   char msg[] = "\"hello\",42";
-  char * v = JSONParser::SkipVal<std::string>(msg, msg + 11, ',');
+  char * v = JSONParser::SkipVal<std::string>(msg, ',');
   EXPECT_EQ(v, msg + 7);
   EXPECT_EQ(*v, ',');
   EXPECT_STREQ(msg + 1, "hello");
@@ -269,7 +268,7 @@ TEST(JsonParserTest, SkipValString)
 TEST(JsonParserTest, SkipValStringWithMin)
 {
   char msg[] = "\"hello\",42";
-  char * v = JSONParser::SkipVal<std::string>(msg, msg + 11, ',', 5);
+  char * v = JSONParser::SkipVal<std::string>(msg, ',', 5);
   EXPECT_EQ(v, msg + 7);
   EXPECT_EQ(*v, ',');
   EXPECT_STREQ(msg + 1, "hello");

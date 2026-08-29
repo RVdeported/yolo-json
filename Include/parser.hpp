@@ -86,27 +86,43 @@ template <class T> consteval auto GetOrderedField()
   return out;
 }
 
+//--------------------------------------------------------//
+// ParseBase                                              //
+//--------------------------------------------------------//
 template <std::meta::info T, char Delim1 = ',', bool Ignore = false,
           int MinSz = 0, int FxSz = -1, char Delim2 = Delim1>
-std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
+std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
 {
   static_assert(IsBase<T>());
   constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
   constexpr bool integral = std::meta::is_integral_type(T);
   constexpr bool floating = std::meta::is_floating_point_type(T);
+  constexpr bool str = !integral && !floating;
+  constexpr bool precEnd = Delim1 != Delim2 && !str;
 
   char Delim = Delim1;
-  if constexpr (Delim1 != Delim2)
+  if constexpr (precEnd)
   {
-    char const * from = curr;
-    char const * d1 = std::find(from, end, Delim1);
-    char const * d2 = std::find(from, end, Delim2);
-    Delim = d1 < d2 ? Delim1 : Delim2;
+    char * tmp = curr;
+    do
+    {
+      tmp++;
+    } while (*tmp != Delim1 && *tmp != Delim2);
+    Delim = *tmp;
+    end = tmp;
   }
 
   if constexpr (Ignore)
   {
-    char * after = JSONParser::SkipVal<typename[:T:]>(curr, end, Delim, AddLen);
+    char * after;
+    if constexpr (precEnd)
+    {
+      after = JSONParser::SkipVal<typename[:T:]>(curr, end, AddLen);
+    }
+    else
+    {
+      after = JSONParser::SkipVal<typename[:T:]>(curr, Delim, AddLen);
+    }
     assert(*after == Delim);
     return {after, typename[:T:]{}};
   }
@@ -114,10 +130,20 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char const * end)
   {
     if constexpr (integral || floating)
     {
-      auto [val, after] =
-          JSONParser::ReadNumber<typename[:T:]>(curr, end, Delim, AddLen);
-      assert(*after == Delim);
+      char * after;
+      typename[:T:] val;
+      if constexpr (precEnd)
+      {
+        std::tie(val, after) =
+            JSONParser::ReadNumber<typename[:T:]>(curr, end, AddLen);
+      }
+      else
+      {
+        std::tie(val, after) =
+            JSONParser::ReadNumber<typename[:T:]>(curr, Delim, AddLen);
+      }
 
+      assert(*after == Delim);
       return {after, val};
     }
     else
@@ -298,6 +324,9 @@ struct ObjectParser
     return {curr, out};
   }
 
+  //--------------------------------------------------------//
+  // ParseContainer                                         //
+  //--------------------------------------------------------//
   template <std::meta::info T, bool Compressed = true>
   static std::pair<char *, typename[:T:]> ParseContainer(char * curr,
                                                          char * end)
@@ -411,6 +440,9 @@ struct ObjectParser
     return {after, v};
   }
 
+  //--------------------------------------------------------//
+  // ParseVal                                               //
+  //--------------------------------------------------------//
   template <std::meta::info T, int sz, int min_sz, bool compressed, char Delim1,
             bool ignore = false, char Delim2 = Delim1>
   static std::pair<char *, typename[:T:]> ParseVal(char * curr, char * end)

@@ -18,6 +18,7 @@
 
 #include "Include/annotations.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <ranges>
@@ -41,11 +42,11 @@ struct Point
 //---------------------------------------------------------------------------//
 struct LargeDynamic
 {
-  std::vector<int> ints;
-  std::vector<double> doubles;
-  std::vector<std::string> strings;
-  std::vector<Point> points;            // vector of nested objects
-  std::vector<std::vector<int>> matrix; // nested dynamic arrays
+  std::array<int, 100> ints;
+  std::array<double, 100> doubles;
+  std::array<std::string, 100> strings;
+  std::array<Point, 100> points;              // vector of nested objects
+  std::array<std::array<int, 10>, 10> matrix; // nested dynamic arrays
   int id;
   std::string label;
 };
@@ -183,15 +184,10 @@ struct[[= yjson::RandomOrder{}]] LargeRandomOrder
 // Factories                                                                  //
 //===========================================================================//
 
-inline LargeDynamic MakeLargeDynamic(std::size_t n)
+inline LargeDynamic MakeLargeDynamic(int n)
 {
   LargeDynamic v;
-  v.ints.resize(n);
-  v.doubles.resize(n);
-  v.strings.resize(n);
-  v.points.resize(n);
-  const std::size_t rows = n / 10 + 1;
-  v.matrix.resize(rows);
+  n = std::min(100, n);
   for (std::size_t i = 0; i < n; ++i)
   {
     v.ints[i] = static_cast<int>(i % 1000);
@@ -200,11 +196,12 @@ inline LargeDynamic MakeLargeDynamic(std::size_t n)
     v.points[i] = Point{static_cast<double>(i), static_cast<double>(i) + 0.5,
                         static_cast<double>(i) + 1.0};
   }
+
+  int rows = n / 10 + 1;
   for (std::size_t r = 0; r < rows; ++r)
   {
-    v.matrix[r].resize(8);
-    for (std::size_t c = 0; c < 8; ++c)
-      v.matrix[r][c] = static_cast<int>(r * 8 + c);
+    for (std::size_t c = 0; c < rows; ++c)
+      v.matrix[r][c] = static_cast<int>(r * n + c);
   }
   v.id = 12345;
   v.label = "large_dynamic";

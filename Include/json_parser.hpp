@@ -174,16 +174,32 @@ I ReadInt(CharPtr a_from, char const * a_to)
 // "ReadNumber":                                                           //
 //-------------------------------------------------------------------------//
 template <typename T, typename CharPtr>
-std::pair<T, char *> ReadNumber(CharPtr a_from, char const * a_to,
-                                char a_delimiter, int a_min_len = 0)
+std::pair<T, char *> ReadNumber(CharPtr a_from, char * a_to, int a_min_len = 0)
 {
   static_assert(IsCharPtr<CharPtr>);
   assert(a_from != nullptr && a_to != nullptr && a_from + a_min_len < a_to);
 
   char * cfrom = a_from + a_min_len;
+
+  T res;
+  if constexpr (std::is_floating_point_v<T>)
+    res = ReadDouble<T>(a_from, a_to);
+  else
+    res = ReadInt<T>(a_from, a_to);
+
+  return std::pair{res, a_to};
+}
+
+template <typename T, typename CharPtr>
+std::pair<T, char *> ReadNumber(CharPtr a_from, char a_delimiter,
+                                int a_min_len = 0)
+{
+  static_assert(IsCharPtr<CharPtr>);
+  assert(a_from != nullptr);
+
+  char * cfrom = a_from + a_min_len;
   char * number_end =
-      cfrom + (std::find((char const *)cfrom, a_to, a_delimiter) - cfrom);
-  assert(number_end < a_to);
+      cfrom + (std::find(cfrom, cfrom + 1000, a_delimiter) - cfrom);
   assert(*number_end == a_delimiter);
 
   T res;
@@ -246,24 +262,37 @@ CharPtr FindVal(char const (&a_key)[N],
 
 // Skip of the base val
 template <typename T, typename CharPtr>
-CharPtr SkipVal(CharPtr a_from, char const * a_to, char a_delimiter,
-                int a_min_len = 0)
+CharPtr SkipVal(CharPtr a_from, char * a_to, int a_min_len = 0)
 {
   char * curr = a_from;
+  static_assert(std::is_floating_point_v<T> || std::is_integral_v<T>);
+  char const * cfrom = a_from;
+  assert(a_from + a_min_len < a_to);
+  // char const * end = std::find(cfrom + a_min_len, a_to, a_delimiter);
+  return a_to;
+}
+
+template <typename T, typename CharPtr>
+CharPtr SkipVal(CharPtr a_from, char a_delimiter, int a_min_len = 0)
+{
   if constexpr (std::is_floating_point_v<T> || std::is_integral_v<T>)
   {
-    char const * cfrom = a_from;
-    assert(a_from + a_min_len < a_to);
-    char const * end = std::find(cfrom + a_min_len, a_to, a_delimiter);
-    return a_from + (end - cfrom);
+    char * cfrom = a_from;
+    char * end = cfrom + (std::find(cfrom + a_min_len, cfrom + a_min_len + 1000,
+                                    a_delimiter) -
+                          cfrom);
+    return end;
   }
   else
   {
+    char * curr = a_from;
     assert(*curr == '"');
     assert(a_min_len >= 0);
     curr += a_min_len;
     GET_STR(_);
-    assert(*curr == a_delimiter);
+    // For string we actually do not need the separator - it can
+    // be any value
+    // assert(*curr == a_delimiter);
     return curr;
   }
 }

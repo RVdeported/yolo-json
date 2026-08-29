@@ -26,7 +26,7 @@ template <typename T> std::vector<std::string> GenForParse(int a_sz_mb, T & a_v)
 
 template <typename T = benchmark_types::LargeDynamic> T GetSample()
 {
-  return benchmark_types::MakeLargeDynamic(10);
+  return benchmark_types::MakeLargeDynamic(99);
 }
 template <> benchmark_types::LargeFixed GetSample()
 {
