@@ -1,20 +1,10 @@
 #pragma once
 
-#include "Include/annotations.hpp"
-#include "Include/json_parser.hpp"
-#include "Include/utils.hpp"
+#include "json_parser.hpp"
+#include "utils.hpp"
 #include <cassert>
 #include <cstring>
-#include <iostream>
-#include <limits>
 #include <meta>
-#include <print>
-#include <ranges>
-#include <span>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
 
 namespace yjson
 {
@@ -23,8 +13,8 @@ template <class T> consteval auto GetOrderedField()
   //--------------------------------------------------------//
   // Collect annotations of the struct                      //
   //--------------------------------------------------------//
-  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();
-  constexpr auto fldsAnnots = FieldAnnots::MkFldAnnots<T>();
+  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<^^T>();
+  constexpr auto fldsAnnots = FieldAnnots::MkFldAnnots<^^T>();
   constexpr auto fields = GetRelFields<T>();
   constexpr auto sz = fldsAnnots.size();
   std::array<int, sz> out{};
@@ -173,7 +163,7 @@ struct ObjectParser
   static std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
   {
     using T_ = typename[:T:];
-    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
+    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();
 
     if constexpr (strAnnots.m_random_order)
     {
@@ -226,8 +216,8 @@ struct ObjectParser
     constexpr auto flds = GetRelFields<T_>();
     constexpr auto flds_ord = GetOrderedField<T_>();
     constexpr auto sz = flds.size();
-    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
-    constexpr auto fldAnnots = FieldAnnots::MkFldAnnots<T_>();
+    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();
+    constexpr auto fldAnnots = FieldAnnots::MkFldAnnots<T>();
 
     std::array<bool, sz> parsed{};
     curr++;
@@ -618,7 +608,7 @@ struct ObjectParser
     }
     return {curr, out};
   }
-};
+}; // ObjectParser
 
 } // namespace detail
 

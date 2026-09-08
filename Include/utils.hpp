@@ -13,68 +13,46 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <contracts>
 
 namespace yjson
 {
 
-// Base case: types are different
-template <typename T, typename U> struct is_same_template : std::false_type
+
+//--------------------------------------------------------//
+// get_annotations                                        //
+//--------------------------------------------------------//
+// @brief returns the annotation object of given 'ann' type
+// within the 'entity' type
+// @param ann annotation type to search for
+// @param entity an object to find the annotations in
+// @return a static range of captured annotation reflections
+template <std::meta::info ann, std::meta::info entity> consteval auto get_annotations()
 {
-};
-
-// Specialization: matching template template parameters
-template <template <typename...> class Template, typename... Args1,
-          typename... Args2>
-struct is_same_template<Template<Args1...>, Template<Args2...>> : std::true_type
-{
-};
-
-// Helper variable template for ease of use
-template <typename T, typename U>
-inline constexpr bool is_same_template_v = is_same_template<T, U>::value;
-
-consteval bool compare_naked_templates(std::meta::info typeA,
-                                       std::meta::info typeB)
-{
-  bool has_args_a = std::meta::has_template_arguments(typeA);
-  bool has_args_b = std::meta::has_template_arguments(typeB);
-
-  auto base_a = has_args_a ? std::meta::template_of(typeA) : typeA;
-  auto base_b = has_args_b ? std::meta::template_of(typeB) : typeB;
-
-  return base_a == base_b;
-}
-
-template <typename T>
-consteval auto has_annotation(std::meta::info r, T const & value) -> bool
-{
-  return std::ranges::contains(annotations_of_with_type(r, ^^T),
-                               std::meta::reflect_constant(value),
-                               std::meta::constant_of);
-}
-
-template <typename T, typename U> consteval auto get_annotations()
-{
-  constexpr auto ann =
-      std::define_static_array(std::meta::annotations_of_with_type(^^U, ^^T));
-  return ann;
-}
-
-template <typename T, std::meta::info entity> consteval auto get_annotations()
-{
+  static_assert(std::meta::is_type(ann));
   return std::define_static_array(
-      std::meta::annotations_of_with_type(entity, ^^T));
+      std::meta::annotations_of_with_type(entity, ann));
 }
 
+//--------------------------------------------------------//
+// GetRelFields                                           //
+//--------------------------------------------------------//
+// @brief provides the Relevant fields from a struct / class
+// @param T class type
+// @return range of non static, non-function members of a class
 template <typename T> consteval auto GetRelFields()
 {
+  static_assert(std::meta::is_class_type(^^T));
+
   constexpr auto flds = std::define_static_array(
       std::meta::members_of(^^T, std::meta::access_context::unchecked()));
 
   return std::define_static_array(std::views::filter(
       flds, [](auto & v)
-      { return std::meta::has_identifier(v) && !std::meta::is_function(v); }));
+      { return std::meta::has_identifier(v) && !std::meta::is_function(v)
+        && !std::meta::is_static_member(v); }));
 }
+
 
 template <std::meta::info T> consteval auto GetRelFuncs()
 {
@@ -166,35 +144,35 @@ struct FieldAnnots
   {
     FieldAnnots ann;
 
-    if constexpr (constexpr auto pos = get_annotations<Position, fld>();
+    if constexpr (constexpr auto pos = get_annotations<^^Position, fld>();
                   pos.size() > 0)
     {
       ann.m_pos = std::meta::extract<Position>(pos[0])._Pos;
     }
 
-    if constexpr (constexpr auto sz = get_annotations<Size, fld>();
+    if constexpr (constexpr auto sz = get_annotations<^^Size, fld>();
                   sz.size() > 0)
     {
       ann.m_sz = std::meta::extract<Size>(sz[0])._Sz;
     }
 
-    if constexpr (constexpr auto st_sz = get_annotations<StaticSize, fld>();
+    if constexpr (constexpr auto st_sz = get_annotations<^^StaticSize, fld>();
                   st_sz.size() > 0)
     {
       ann.m_static_sz = std::meta::extract<StaticSize>(st_sz[0])._Sz;
     }
 
-    if constexpr (get_annotations<Ignore, fld>().size() > 0)
+    if constexpr (get_annotations<^^Ignore, fld>().size() > 0)
     {
       ann.m_ignore = true;
     }
 
-    if constexpr (get_annotations<MayAbsent, fld>().size() > 0)
+    if constexpr (get_annotations<^^MayAbsent, fld>().size() > 0)
     {
       ann.m_may_absent = true;
     }
 
-    if constexpr (constexpr auto dn = get_annotations<DisplayName, fld>();
+    if constexpr (constexpr auto dn = get_annotations<^^DisplayName, fld>();
                   dn.size() > 0)
     {
       constexpr auto dname = std::meta::extract<DisplayName>(dn[0]);
@@ -205,9 +183,9 @@ struct FieldAnnots
     return ann;
   }
 
-  template <typename T> static consteval auto MkFldAnnots()
+  template <std::meta::info T> static consteval auto MkFldAnnots()
   {
-    constexpr auto flds = GetRelFields<T>();
+    constexpr auto flds = GetRelFields<typename[:T:]>();
     constexpr auto n = std::ranges::size(flds);
     std::array<FieldAnnots, n> out{};
 
@@ -226,25 +204,25 @@ struct StructAnnots
   bool m_compressed = true;
   bool m_random_order = false;
 
-  template <typename T> static consteval StructAnnots MkStrAnnots()
+  template <std::meta::info T> static consteval StructAnnots MkStrAnnots()
   {
     StructAnnots out;
 
-    if constexpr (constexpr auto alph = get_annotations<Alphabetical, T>();
+    if constexpr (constexpr auto alph = get_annotations<^^Alphabetical, T>();
                   alph.size() > 0)
     {
       out.m_alphabetical = std::meta::extract<Alphabetical>(alph[0])._Rev;
     }
 
     if constexpr (constexpr auto not_compressed =
-                      get_annotations<NotCompressed, T>();
+                      get_annotations<^^NotCompressed, T>();
                   not_compressed.size() > 0)
     {
       out.m_compressed = false;
     }
 
     if constexpr (constexpr auto random_order =
-                      get_annotations<RandomOrder, T>();
+                      get_annotations<^^RandomOrder, T>();
                   random_order.size() > 0)
     {
       out.m_random_order = true;
@@ -293,8 +271,8 @@ consteval int compare_str_ci(std::string_view a, std::string_view b)
 // `_Rev` flag is true the resulting order is reversed.
 template <typename T> consteval auto SortFieldsAlphabetically()
 {
-  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();
-  constexpr auto fldAnnots = FieldAnnots::MkFldAnnots<T>();
+  constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<^^T>();
+  constexpr auto fldAnnots = FieldAnnots::MkFldAnnots<^^T>();
   constexpr auto fields = GetRelFields<T>();
   constexpr auto n = fields.size();
 

@@ -16,8 +16,6 @@
 //     toggles whitespace tolerance.
 #pragma once
 
-#include "Include/annotations.hpp"
-
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -25,6 +23,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <utils.hpp>
 
 namespace benchmark_types
 {

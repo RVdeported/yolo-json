@@ -3,7 +3,7 @@
 //      End-to-end tests for Include/serializer.hpp (yjson::SerializeJson)   //
 //===========================================================================//
 #include "Include/parser.hpp"
-#include "Include/serializer.hpp"
+#include "benchmark/Src/serializer.hpp"
 
 #include <gtest/gtest.h>
 

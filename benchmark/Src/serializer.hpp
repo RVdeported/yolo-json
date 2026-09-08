@@ -4,7 +4,6 @@
 //===========================================================================//
 #pragma once
 
-#include "Include/annotations.hpp"
 #include "Include/parser.hpp"
 #include "Include/utils.hpp"
 
@@ -229,7 +228,7 @@ private:
   void SerializeObject(const typename[:T:] & value, std::string & out)
   {
     using T_ = typename[:T:];
-    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T_>();
+    constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();
     constexpr auto flds = GetRelFields<T_>();
     constexpr auto flds_ord = GetOrderedField<T_>();
     constexpr auto sz = flds.size();

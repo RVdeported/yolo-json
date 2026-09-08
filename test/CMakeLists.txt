@@ -27,7 +27,7 @@ FOREACH(TEST json_parser parser annotations serializer)
     ${CMAKE_SOURCE_DIR}/utxx/include
   )
 
-  TARGET_COMPILE_OPTIONS(test_${TEST} PRIVATE "-freflection")
+  TARGET_COMPILE_OPTIONS(test_${TEST} PRIVATE ${CXXFLAGS})
   TARGET_LINK_LIBRARIES(test_${TEST} PRIVATE GTest::gtest_main)
   GTEST_DISCOVER_TESTS(test_${TEST})
 ENDFOREACH()

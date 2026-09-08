@@ -122,7 +122,7 @@ struct StaticSized
 //---------------------------------------------------------------------------//
 TEST(StructAnnotationsTest, Defaults)
 {
-  constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::Plain>();
+  constexpr auto a = yjson::StructAnnots::MkStrAnnots<^^test_types::Plain>();
   EXPECT_FALSE(a.m_alphabetical.has_value());
   EXPECT_TRUE(a.m_compressed);
   EXPECT_FALSE(a.m_random_order);
@@ -130,7 +130,7 @@ TEST(StructAnnotationsTest, Defaults)
 
 TEST(StructAnnotationsTest, AlphabeticalForward)
 {
-  constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::AlphaFwd>();
+  constexpr auto a = yjson::StructAnnots::MkStrAnnots<^^test_types::AlphaFwd>();
   ASSERT_TRUE(a.m_alphabetical.has_value());
   EXPECT_FALSE(a.m_alphabetical.value());
   EXPECT_TRUE(a.m_compressed);
@@ -138,14 +138,14 @@ TEST(StructAnnotationsTest, AlphabeticalForward)
 
 TEST(StructAnnotationsTest, AlphabeticalReverse)
 {
-  constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::AlphaRev>();
+  constexpr auto a = yjson::StructAnnots::MkStrAnnots<^^test_types::AlphaRev>();
   ASSERT_TRUE(a.m_alphabetical.has_value());
   EXPECT_TRUE(a.m_alphabetical.value());
 }
 
 TEST(StructAnnotationsTest, NotCompressed)
 {
-  constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::NotComp>();
+  constexpr auto a = yjson::StructAnnots::MkStrAnnots<^^test_types::NotComp>();
   EXPECT_TRUE(a.m_alphabetical.has_value());
   EXPECT_FALSE(a.m_alphabetical.value());
   EXPECT_FALSE(a.m_compressed);
@@ -153,7 +153,7 @@ TEST(StructAnnotationsTest, NotCompressed)
 
 TEST(StructAnnotationsTest, RandomOrder)
 {
-  constexpr auto a = yjson::StructAnnots::MkStrAnnots<test_types::RandomOrd>();
+  constexpr auto a = yjson::StructAnnots::MkStrAnnots<^^test_types::RandomOrd>();
   EXPECT_FALSE(a.m_alphabetical.has_value());
   EXPECT_TRUE(a.m_compressed);
   EXPECT_TRUE(a.m_random_order);
@@ -165,7 +165,7 @@ TEST(StructAnnotationsTest, RandomOrder)
 TEST(FieldAnnotationsTest, Extraction)
 {
   constexpr auto f =
-      yjson::FieldAnnots::MkFldAnnots<test_types::AnnotatedFields>();
+      yjson::FieldAnnots::MkFldAnnots<^^test_types::AnnotatedFields>();
   ASSERT_EQ(f.size(), 5u);
 
   // [[= Position{3}]] int pos_field;
@@ -201,7 +201,7 @@ TEST(FieldAnnotationsTest, Extraction)
 
 TEST(FieldAnnotationsTest, StaticSizeExtraction)
 {
-  constexpr auto f = yjson::FieldAnnots::MkFldAnnots<test_types::StaticSized>();
+  constexpr auto f = yjson::FieldAnnots::MkFldAnnots<^^test_types::StaticSized>();
   ASSERT_EQ(f.size(), 2u);
 
   // [[= StaticSize{7}]] std::array<int, 7> a;
