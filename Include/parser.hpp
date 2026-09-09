@@ -1,3 +1,6 @@
+//========================================================//
+// Parser.hpp                                             //
+//========================================================//
 #pragma once
 
 #include "json_parser.hpp"
@@ -6,8 +9,25 @@
 #include <cstring>
 #include <meta>
 
+//! Reflection-driven JSON parser for annotated structs.
 namespace yjson
 {
+//--------------------------------------------------------//
+// GetOrderedField                                        //
+//--------------------------------------------------------//
+/**
+ * @brief Computes the parse order of the fields of the annotated struct @a T.
+ *
+ * Builds a field index permutation describing the order in which the JSON
+ * object's values are expected to appear. Fields carrying an explicit
+ * Position annotation are pinned to that slot; the remaining fields are
+ * placed in the remaining slots in declaration order (or alphabetically when
+ * the Alphabetical struct annotation is present).
+ *
+ * @tparam T the struct type to order
+ * @return an @c std::array mapping each parse position to the corresponding
+ *         member index
+ */
 template <class T> consteval auto GetOrderedField()
 {
   //--------------------------------------------------------//
@@ -80,6 +100,24 @@ template <class T> consteval auto GetOrderedField()
 //--------------------------------------------------------//
 // ParseBase                                              //
 //--------------------------------------------------------//
+/**
+ * @brief Parses a single base (scalar) value of type @a T from the JSON
+ *        buffer.
+ *
+ * Handles integral, floating-point and string values. When Ignore is set the
+ * value is skipped rather than materialized. A two-delimiter mode
+ * (Delim1 != Delim2) supports parsing up to a known closing delimiter.
+ *
+ * @tparam T reflected type of the base value
+ * @tparam Delim1 primary delimiter following the value
+ * @tparam Ignore when true, skip the value instead of reading it
+ * @tparam MinSz minimum number of characters the value is guaranteed to occupy
+ * @tparam FxSz fixed length of the value when known (-1 otherwise)
+ * @tparam Delim2 secondary (closing) delimiter, defaulting to Delim1
+ * @param curr pointer to the first character of the value
+ * @param end one-past-the-end pointer of the input buffer
+ * @return a pair of the pointer just past the value and the parsed value
+ */
 template <std::meta::info T, char Delim1 = ',', bool Ignore = false,
           int MinSz = 0, int FxSz = -1, char Delim2 = Delim1>
 std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
@@ -151,14 +189,29 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
   std::unreachable();
 }
 
+//! Implementation details of the reflection-driven JSON parser.
 namespace detail
 {
-
-// The mutually recursive object parser. Member functions may call each other
-// regardless of declaration order, which avoids redeclaring function templates
-// whose return type contains a reflection splice.
+//--------------------------------------------------------//
+// ObjectParser                                           //
+//--------------------------------------------------------//
+/**
+ * @brief The mutually recursive object parser.
+ *
+ * Member functions may call each other regardless of declaration order, which
+ * avoids redeclaring function templates whose return type contains a
+ * reflection splice.
+ */
 struct ObjectParser
 {
+  /**
+   * @brief Parses a JSON object into a value of the annotated struct @a T.
+   *
+   * @tparam T reflected type of the object to parse
+   * @param curr pointer to the opening '{' of the object
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the object and the parsed value
+   */
   template <std::meta::info T>
   static std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
   {
@@ -201,10 +254,18 @@ struct ObjectParser
     }
   }
 
-  // Parse an object whose JSON fields may appear in any order. Every key in
-  // the JSON is matched against the not-yet-parsed fields of the struct (by
-  // identifier or DisplayName); MayAbsent fields simply stay absent when
-  // their key never appears.
+  /**
+   * @brief Parses a JSON object whose fields may appear in any order.
+   *
+   * Every key in the JSON is matched against the not-yet-parsed fields of the
+   * struct (by identifier or DisplayName); MayAbsent fields simply stay absent
+   * when their key never appears.
+   *
+   * @tparam T reflected type of the object to parse
+   * @param curr pointer to the opening '{' of the object
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the object and the parsed value
+   */
   template <std::meta::info T>
   static std::pair<char *, typename[:T:]> ParseJsonRandomOrder(char * curr,
                                                                char * end)
@@ -288,6 +349,15 @@ struct ObjectParser
     return {curr, out};
   }
 
+  /**
+   * @brief Parses a JSON array into a std::tuple / std::pair value.
+   *
+   * @tparam T reflected tuple/pair type
+   * @tparam Compressed when false, whitespace is tolerated between tokens
+   * @param curr pointer to the opening '[' of the array
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the array and the parsed value
+   */
   template <std::meta::info T, bool Compressed = true>
   static std::pair<char *, typename[:T:]> ParseTuple(char * curr, char * end)
   {
@@ -324,6 +394,19 @@ struct ObjectParser
   //--------------------------------------------------------//
   // ParseContainer                                         //
   //--------------------------------------------------------//
+  /**
+   * @brief Parses a JSON array into a dynamic or fixed-size container.
+   *
+   * Supports any container detected by IsContainer (std::array, std::vector,
+   * std::deque, raw arrays, ...), growing dynamic containers element by
+   * element.
+   *
+   * @tparam T reflected container type
+   * @tparam Compressed when false, whitespace is tolerated between tokens
+   * @param curr pointer to the opening '[' of the array
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the array and the parsed value
+   */
   template <std::meta::info T, bool Compressed = true>
   static std::pair<char *, typename[:T:]> ParseContainer(char * curr,
                                                          char * end)
@@ -378,11 +461,22 @@ struct ObjectParser
   //--------------------------------------------------------//
   // ParseContainerStatic (fixed element count)             //
   //--------------------------------------------------------//
-  // Parse a container whose element count is known at compile time (via the
-  // StaticSize annotation). The loop is fully unrolled (`template for`), the
-  // delimiter after every element is a compile-time constant, and dynamic
-  // containers allocate their final storage once up front — so no per-element
-  // growth checks, no delimiter probing and no runtime break test remain.
+  /**
+   * @brief Parses a container holding exactly @a N elements (StaticSize).
+   *
+   * The element count is known at compile time (via the StaticSize
+   * annotation), so the loop is fully unrolled (`template for`), the delimiter
+   * after every element is a compile-time constant, and dynamic containers
+   * allocate their final storage once up front — no per-element growth checks,
+   * no delimiter probing and no runtime break test remain.
+   *
+   * @tparam T reflected container type
+   * @tparam N the exact number of elements to parse
+   * @tparam Compressed when false, whitespace is tolerated between tokens
+   * @param curr pointer to the opening '[' of the array
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the array and the parsed value
+   */
   template <std::meta::info T, int N, bool Compressed = true>
   static std::pair<char *, typename[:T:]> ParseContainerStatic(char * curr,
                                                                char * end)
@@ -449,9 +543,22 @@ struct ObjectParser
     return {curr, out};
   }
 
-  // Parse a single field of the object being parsed. `curr` points at the
-  // field's key; the returned pointer points at the delimiter following the
-  // value (or at the re-wound key when an optional field is absent).
+  /**
+   * @brief Parses a single field of the object being parsed.
+   *
+   * @a curr points at the field's key; the returned pointer points at the
+   * delimiter following the value (or at the re-wound key when an optional
+   * field is absent).
+   *
+   * @tparam curr_fld reflection of the field to parse
+   * @tparam sz the Size annotation value for this field
+   * @tparam min_sz the MinSize annotation value for this field
+   * @tparam compressed when false, whitespace is tolerated between tokens
+   * @tparam Delim delimiter expected after the field's value
+   * @param curr pointer to the field's key
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the value and the parsed value
+   */
   template <std::meta::info curr_fld, int sz, int min_sz, bool compressed,
             char Delim>
   static std::pair<char *, typename[:std::meta::type_of(curr_fld):]>
@@ -513,6 +620,22 @@ struct ObjectParser
   //--------------------------------------------------------//
   // ParseVal                                               //
   //--------------------------------------------------------//
+  /**
+   * @brief Parses a value of arbitrary reflected type @a T, dispatching to the
+   *        appropriate base/tuple/container/object parser.
+   *
+   * @tparam T reflected type of the value
+   * @tparam sz the Size annotation value (-1 when unset)
+   * @tparam min_sz the MinSize annotation value (-1 when unset)
+   * @tparam static_sz the StaticSize annotation value (-1 when unset)
+   * @tparam compressed when false, whitespace is tolerated between tokens
+   * @tparam Delim1 primary delimiter following the value
+   * @tparam ignore when true, skip the value instead of reading it
+   * @tparam Delim2 secondary (closing) delimiter, defaulting to Delim1
+   * @param curr pointer to the first character of the value
+   * @param end one-past-the-end pointer of the input buffer
+   * @return a pair of the pointer just past the value and the parsed value
+   */
   template <std::meta::info T, int sz, int min_sz, int static_sz,
             bool compressed, char Delim1, bool ignore = false,
             char Delim2 = Delim1>
@@ -612,6 +735,15 @@ struct ObjectParser
 
 } // namespace detail
 
+/**
+ * @brief Public entry point: parses a JSON object from the given buffer into a
+ *        value of the annotated struct @a T.
+ *
+ * @tparam T reflected type of the object to parse
+ * @param curr pointer to the opening '{' of the object
+ * @param end one-past-the-end pointer of the input buffer
+ * @return a pair of the pointer just past the object and the parsed value
+ */
 template <std::meta::info T>
 std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
 {

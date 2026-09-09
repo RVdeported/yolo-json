@@ -1,7 +1,6 @@
-//===========================================================================//
-//                    "json_parser.hpp":                                     //
-//            Macros and Utils for Efficient Parsing of JSON Objs            //
-//===========================================================================//
+//========================================================//
+// Json_parser.hpp                                        //
+//========================================================//
 #pragma once
 
 #include <algorithm>
@@ -128,13 +127,22 @@
 //===========================================================================//
 // Utils:                                                                    //
 //===========================================================================//
+//! Low-level JSON token-parsing macros and helper functions.
 namespace JSONParser
 {
 //-------------------------------------------------------------------------//
 // "IsCharPtr":                                                            //
 //-------------------------------------------------------------------------//
+/**
+ * @brief Compile-time trait detecting plain @c char pointer types.
+ *
+ * Primary template is @c false; explicit specializations enable it for
+ * @c char* and @c char const*.
+ */
 template <typename T> constexpr inline bool IsCharPtr = false;
+/** @brief Specialization for mutable @c char*. */
 template <> constexpr inline bool IsCharPtr<char *> = true;
+/** @brief Specialization for immutable @c char const*. */
 template <> constexpr inline bool IsCharPtr<char const *> = true;
 
 //=========================================================================//
@@ -143,6 +151,15 @@ template <> constexpr inline bool IsCharPtr<char const *> = true;
 //-------------------------------------------------------------------------//
 // "ReadDouble":                                                           //
 //-------------------------------------------------------------------------//
+/**
+ * @brief Reads a floating-point number from the buffer range.
+ *
+ * @tparam F floating-point type to read
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_from start of the number
+ * @param a_to one-past-the-end of the number
+ * @return the parsed value (quiet NaN when the range is invalid)
+ */
 template <typename F, typename CharPtr>
 F ReadDouble(CharPtr a_from, char const * a_to)
 {
@@ -158,6 +175,15 @@ F ReadDouble(CharPtr a_from, char const * a_to)
 //-------------------------------------------------------------------------//
 // "ReadInt":                                                              //
 //-------------------------------------------------------------------------//
+/**
+ * @brief Reads an integral number from the buffer range.
+ *
+ * @tparam I integral type to read
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_from start of the number
+ * @param a_to one-past-the-end of the number
+ * @return the parsed value
+ */
 template <typename I, typename CharPtr>
 I ReadInt(CharPtr a_from, char const * a_to)
 {
@@ -173,6 +199,17 @@ I ReadInt(CharPtr a_from, char const * a_to)
 //-------------------------------------------------------------------------//
 // "ReadNumber":                                                           //
 //-------------------------------------------------------------------------//
+/**
+ * @brief Reads a number of type @a T up to the given end pointer.
+ *
+ * @tparam T numeric type to read
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_from start of the number
+ * @param a_to one-past-the-end of the number
+ * @param a_min_len minimum number of characters the number is guaranteed to
+ *                  occupy
+ * @return a pair of the parsed value and the pointer past the number
+ */
 template <typename T, typename CharPtr>
 std::pair<T, char *> ReadNumber(CharPtr a_from, char * a_to, int a_min_len = 0)
 {
@@ -190,6 +227,17 @@ std::pair<T, char *> ReadNumber(CharPtr a_from, char * a_to, int a_min_len = 0)
   return std::pair{res, a_to};
 }
 
+/**
+ * @brief Reads a number of type @a T terminated by @a a_delimiter.
+ *
+ * @tparam T numeric type to read
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_from start of the number
+ * @param a_delimiter delimiter character terminating the number
+ * @param a_min_len minimum number of characters the number is guaranteed to
+ *                  occupy
+ * @return a pair of the parsed value and the pointer to the delimiter
+ */
 template <typename T, typename CharPtr>
 std::pair<T, char *> ReadNumber(CharPtr a_from, char a_delimiter,
                                 int a_min_len = 0)
@@ -215,14 +263,19 @@ std::pair<T, char *> ReadNumber(CharPtr a_from, char a_delimiter,
 // "FindVal":                                                              //
 //-------------------------------------------------------------------------//
 /**
- * Find the beginning of the value after @a_key (which MUST contain enclosing
- * ""s!), ie:
- * @a_key:"*value*"
- * @a_begin  is the over-all msg beginning (assumed to be 0-terminated)
- * @a a_curr is a hint where to start searching
- * If InclSep is set, we assume that @a_key already includes the ':' separator
- * and, if required, the opening quote of the value.
- * Returns the ptr to value (after the opening quote if present):
+ * @brief Finds the beginning of the value associated with @a a_key.
+ *
+ * @a a_key must contain the enclosing quotes. When @a InclSep is set, @a a_key
+ * already includes the ':' separator and, if required, the opening quote of
+ * the value; otherwise the separator is expected right after the key.
+ *
+ * @tparam N length of @a a_key including its NUL terminator
+ * @tparam InclSep when true, @a a_key already includes the separator
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_key the key to search for (including enclosing quotes)
+ * @param a_curr a hint where to start searching (assumed 0-terminated eventually)
+ * @param a_begin the over-all message beginning (assumed 0-terminated)
+ * @return pointer to the value (after the opening quote if present)
  */
 template <int N, bool InclSep = true, typename CharPtr>
 CharPtr FindVal(char const (&a_key)[N],
@@ -260,7 +313,17 @@ CharPtr FindVal(char const (&a_key)[N],
   return it;
 }
 
-// Skip of the base val
+/**
+ * @brief Skips a base value of type @a T up to the given end pointer.
+ *
+ * @tparam T numeric type of the value to skip
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_from start of the value
+ * @param a_to one-past-the-end of the value
+ * @param a_min_len minimum number of characters the value is guaranteed to
+ *                  occupy
+ * @return the pointer past the value (@p a_to)
+ */
 template <typename T, typename CharPtr>
 CharPtr SkipVal(CharPtr a_from, char * a_to, int a_min_len = 0)
 {
@@ -272,6 +335,20 @@ CharPtr SkipVal(CharPtr a_from, char * a_to, int a_min_len = 0)
   return a_to;
 }
 
+/**
+ * @brief Skips a base value of type @a T terminated by @a a_delimiter.
+ *
+ * For numeric types the delimiter is located by scanning forward; for string
+ * types the (quoted) string is skipped to its terminating quote.
+ *
+ * @tparam T type of the value to skip
+ * @tparam CharPtr pointer type (must be char* or char const*)
+ * @param a_from start of the value
+ * @param a_delimiter delimiter character terminating the value
+ * @param a_min_len minimum number of characters the value is guaranteed to
+ *                  occupy
+ * @return the pointer past the value
+ */
 template <typename T, typename CharPtr>
 CharPtr SkipVal(CharPtr a_from, char a_delimiter, int a_min_len = 0)
 {
