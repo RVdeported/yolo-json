@@ -229,7 +229,7 @@ private:
   {
     using T_ = typename[:T:];
     constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();
-    constexpr auto flds = GetRelFields<T_>();
+    constexpr auto flds = GetRelFields<T>();
     constexpr auto flds_ord = GetOrderedField<T_>();
     constexpr auto sz = flds.size();
     constexpr bool compressed = strAnnots.m_compressed;

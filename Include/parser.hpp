@@ -15,7 +15,7 @@ template <class T> consteval auto GetOrderedField()
   //--------------------------------------------------------//
   constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<^^T>();
   constexpr auto fldsAnnots = FieldAnnots::MkFldAnnots<^^T>();
-  constexpr auto fields = GetRelFields<T>();
+  constexpr auto fields = GetRelFields<^^T>();
   constexpr auto sz = fldsAnnots.size();
   std::array<int, sz> out{};
   constexpr auto sorted = SortFieldsAlphabetically<T>();
@@ -174,7 +174,7 @@ struct ObjectParser
       T_ out{};
       assert(curr);
       assert(*curr == '{');
-      constexpr auto flds = GetRelFields<T_>();
+      constexpr auto flds = GetRelFields<T>();
       constexpr auto flds_ord = GetOrderedField<T_>();
       constexpr auto sz = flds.size();
 
@@ -213,7 +213,7 @@ struct ObjectParser
     T_ out{};
     assert(curr);
     assert(*curr == '{');
-    constexpr auto flds = GetRelFields<T_>();
+    constexpr auto flds = GetRelFields<T>();
     constexpr auto flds_ord = GetOrderedField<T_>();
     constexpr auto sz = flds.size();
     constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<T>();

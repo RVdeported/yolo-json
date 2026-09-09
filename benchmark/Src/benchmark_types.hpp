@@ -320,7 +320,7 @@ inline LargeFixed MakeLargeFixed()
 {
   LargeFixed v{};
   // REFLECTIOOONN
-  constexpr auto flds = yjson::GetRelFields<LargeFixed>();
+  constexpr auto flds = yjson::GetRelFields<^^LargeFixed>();
   template for (constexpr auto i : std::views::indices(flds.size()))
   {
     constexpr auto fld = flds[i];

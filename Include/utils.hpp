@@ -22,11 +22,11 @@ namespace yjson
 //--------------------------------------------------------//
 // get_annotations                                        //
 //--------------------------------------------------------//
-// @brief returns the annotation object of given 'ann' type
-// within the 'entity' type
-// @param ann annotation type to search for
-// @param entity an object to find the annotations in
-// @return a static range of captured annotation reflections
+//@brief returns the annotation object of given 'ann' type
+//within the 'entity' type
+//@param ann annotation type to search for
+//@param entity an object to find the annotations in
+//@return a static range of captured annotation reflections
 template <std::meta::info ann, std::meta::info entity> consteval auto get_annotations()
 {
   static_assert(std::meta::is_type(ann));
@@ -38,14 +38,14 @@ template <std::meta::info ann, std::meta::info entity> consteval auto get_annota
 // GetRelFields                                           //
 //--------------------------------------------------------//
 // @brief provides the Relevant fields from a struct / class
-// @param T class type
+// @param T class type reflection
 // @return range of non static, non-function members of a class
-template <typename T> consteval auto GetRelFields()
+template <std::meta::info T> consteval auto GetRelFields()
 {
-  static_assert(std::meta::is_class_type(^^T));
+  static_assert(std::meta::is_class_type(T));
 
   constexpr auto flds = std::define_static_array(
-      std::meta::members_of(^^T, std::meta::access_context::unchecked()));
+      std::meta::members_of(T, std::meta::access_context::unchecked()));
 
   return std::define_static_array(std::views::filter(
       flds, [](auto & v)
@@ -54,6 +54,12 @@ template <typename T> consteval auto GetRelFields()
 }
 
 
+//--------------------------------------------------------//
+// GetRelFuncs                                            //
+//--------------------------------------------------------//
+@brief provides the Relevant functions from a struct / class
+@param T class type reflection
+@return range of function members of T
 template <std::meta::info T> consteval auto GetRelFuncs()
 {
   constexpr auto flds = std::define_static_array(
@@ -67,10 +73,17 @@ template <std::meta::info T> consteval auto GetRelFuncs()
 //----------------------//
 // Struct annotations   //
 //----------------------//
+
+/**
+ * @class Alphabetical
+ * @brief struct tag for marking the struct beign on alphabetically ordered in JSON
+ */
 struct Alphabetical
 {
+  // @brief whether the order is reversed
   bool _Rev;
 };
+
 
 struct NotCompressed
 {
@@ -185,7 +198,7 @@ struct FieldAnnots
 
   template <std::meta::info T> static consteval auto MkFldAnnots()
   {
-    constexpr auto flds = GetRelFields<typename[:T:]>();
+    constexpr auto flds = GetRelFields<T>();
     constexpr auto n = std::ranges::size(flds);
     std::array<FieldAnnots, n> out{};
 
@@ -273,7 +286,7 @@ template <typename T> consteval auto SortFieldsAlphabetically()
 {
   constexpr StructAnnots strAnnots = StructAnnots::MkStrAnnots<^^T>();
   constexpr auto fldAnnots = FieldAnnots::MkFldAnnots<^^T>();
-  constexpr auto fields = GetRelFields<T>();
+  constexpr auto fields = GetRelFields<^^T>();
   constexpr auto n = fields.size();
 
   // Build the case-insensitive sort key of each field:
