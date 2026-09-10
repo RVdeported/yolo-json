@@ -1,6 +1,6 @@
-README
-
 # yolo-json
+
+![Project Screenshot](./images/screenshot.png)
 
 A **header-only, reflection-driven JSON parser for C++26**. 
 
