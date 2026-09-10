@@ -77,10 +77,6 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/utxx/include)
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/Include)
 
-ADD_EXECUTABLE(main main.cpp)
-# TARGET_LINK_LIBRARIES(main PRIVATE )
-TARGET_COMPILE_OPTIONS(main PRIVATE   ${CXXFLAGS})
-
 #=============================================================================#
 # Tests (GoogleTest):                                                         #
 #=============================================================================#

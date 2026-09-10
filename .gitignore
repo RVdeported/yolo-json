@@ -1,3 +1,7 @@
 build/
 *.json
 benchmark/Src/simdjson.*
+html/
+latex/
+Testing/
+
