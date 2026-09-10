@@ -184,6 +184,10 @@ benchmark/          simdjson comparison benchmark (BUILD_BENCH=ON)
 utxx/               git submodule dependency
 ```
 
+## Benchmark
+The following is the benchmark with simdjson framework. Results are replicable with the `-DBUILD_BENCH=ON` cmake configuration. Graph reflects time for 1 Gb of JSON parcing.
+![Benchmark](./images/bench.png)
+
 ## License
 
 See [LICENSE](resources/b344569218c742099739a14e93d5c25e.bin).
