@@ -413,6 +413,8 @@ template <typename T> consteval auto SortFieldsAlphabetically()
 
   // Build the case-insensitive sort key of each field:
   std::array<std::string_view, n> keys{};
+
+  // Place the filed names
   template for (constexpr auto i : std::views::indices(n))
   {
     if constexpr (fldAnnots[i].m_disp_name[0] != '\0')
@@ -449,6 +451,7 @@ template <std::meta::info T> consteval bool HasFuncWithName(std::string_view s)
   return std::ranges::contains(funcs, s, std::meta::identifier_of);
 }
 
+// Forward declarations
 template <std::meta::info T, bool top_lvl = true> consteval bool IsBase();
 template <std::meta::info T> consteval bool IsOption();
 
@@ -471,8 +474,6 @@ template <std::meta::info T> consteval bool IsContainer()
   else if constexpr (std::meta::has_template_arguments(T) &&
                      std::meta::template_of(T) == ^^std::array)
   {
-    // Fixed-size containers (std::array) lack push_back/emplace_back, so the
-    // dynamic-container probe below would miss them.
     return true;
   }
   else

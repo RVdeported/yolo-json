@@ -46,6 +46,7 @@ Commit\t${COMMIT_NAME}\nTime\t${DATE}\n")
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${LIB_DIR}")
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${LIB_DIR}")
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${BIN_DIR}")
+SET(CXXFLAGS "-freflection" "-std=c++26" "-Wno-deprecated-enum-float-conversion")
 # ==========================================================
 # DISPLAY CONFIGURATIONS
 # ==========================================================
@@ -57,16 +58,13 @@ message(STATUS "  Compiler Path:    ${CMAKE_CXX_COMPILER}")
 message(STATUS "-------------------------------------------------------")
 
 message(STATUS "Git Information:")
-message(STATUS "  Branch:           ${GIT_BRANCH}")
-message(STATUS "  Commit Hash:      ${GIT_COMMIT_HASH}")
-message(STATUS "  Last Commit By:   ${GIT_LAST_COMMIT_AUTHOR}")
-message(STATUS "  Last Commit Date: ${GIT_LAST_COMMIT_DATE}")
-message(STATUS "  Last Commit Msg:  ${GIT_LAST_COMMIT_MESSAGE}")
+message(STATUS "  Branch:           ${BRANCH_NAME}")
+message(STATUS "  Remote:           ${REMOTE_NAME}")
+message(STATUS "  Last Commit Hash: ${COMMIT_NAME}")
 message(STATUS "-------------------------------------------------------")
 
 message(STATUS "Build Configuration:")
 message(STATUS "  Build Type:       ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Architecture:     ${CMAKE_SYSTEM_PROCESSOR} (64-bit: ${BUILD_64BIT})")
 message(STATUS "  C++ Standard:     C++${CMAKE_CXX_STANDARD}")
 message(STATUS "=======================================================")
 message(STATUS "  CFLAGS:    ${CXXFLAGS}")
@@ -76,12 +74,12 @@ message(STATUS "  CFLAGS:    ${CXXFLAGS}")
 #=============================================================================#
 INCLUDE(FetchContent)
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/utxx/include)
-
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
+INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/Include)
 
 ADD_EXECUTABLE(main main.cpp)
 # TARGET_LINK_LIBRARIES(main PRIVATE )
-TARGET_COMPILE_OPTIONS(main PRIVATE "-freflection" "-std=c++26"  ${CXXFLAGS})
+TARGET_COMPILE_OPTIONS(main PRIVATE   ${CXXFLAGS})
 
 #=============================================================================#
 # Tests (GoogleTest):                                                         #
@@ -97,3 +95,26 @@ OPTION(BUILD_BENCH "Do build benchmark with simdjson?" OFF)
 IF(BUILD_BENCH)
   ADD_SUBDIRECTORY(benchmark)
 ENDIF()
+
+#=============================================================================#
+# Install:                                                                    #
+#=============================================================================#
+INCLUDE(GNUInstallDirs)
+
+INSTALL(DIRECTORY ${CMAKE_SOURCE_DIR}/Include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/yolo-json)
+
+SET(UTXX_INSTALL_HEADERS
+    utxx/compiler_hints.hpp
+    utxx/convert.hpp
+    utxx/meta.hpp
+    utxx/bits.hpp
+    utxx/types.hpp
+    utxx/detail/bit_count.hpp
+)
+
+FOREACH(HEADER ${UTXX_INSTALL_HEADERS})
+  GET_FILENAME_COMPONENT(HEADER_DIR ${HEADER} DIRECTORY)
+  INSTALL(FILES ${CMAKE_SOURCE_DIR}/utxx/include/${HEADER}
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/yolo-json/${HEADER_DIR})
+ENDFOREACH()
