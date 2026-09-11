@@ -123,7 +123,6 @@ template <std::meta::info T, char Delim1 = ',', bool Ignore = false,
           int MinSz = 0, int FxSz = -1, char Delim2 = Delim1>
 std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
 {
-  // std::cout << curr << '\n';
   constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
   constexpr bool integral = std::meta::is_integral_type(T);
   constexpr bool floating = std::meta::is_floating_point_type(T);
@@ -181,8 +180,8 @@ std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
       GET_STR(Out);
       // GET_STR NUL-terminates the field in place; `curr` now points one past
       // the terminator, so the string length is `curr - Out - 1`. Building from
-      // (ptr, len) avoids a second strlen scan and, for std::string_view, copies
-      // nothing at all (the view just references the input buffer).
+      // (ptr, len) avoids a second strlen scan and, for std::string_view,
+      // copies nothing at all (the view just references the input buffer).
       const std::size_t len = static_cast<std::size_t>(curr - Out - 1);
       return {curr, typename[:T:](Out, len)};
     }
@@ -745,8 +744,7 @@ struct ObjectParser
  * @param end one-past-the-end pointer of the input buffer
  * @return the T structure
  */
-template <std::meta::info T>
-typename[:T:] ParseJson(char * curr, char * end)
+template <std::meta::info T> typename[:T:] ParseJson(char * curr, char * end)
 {
   return detail::ObjectParser::ParseJson<T>(curr, end).second;
 }
@@ -759,8 +757,7 @@ typename[:T:] ParseJson(char * curr, char * end)
  * @param curr pointer to the opening '{' of the object
  * @return the T structure
  */
-template <std::meta::info T>
-typename[:T:] ParseJson(char * curr)
+template <std::meta::info T> typename[:T:] ParseJson(char * curr)
 {
   return detail::ObjectParser::ParseJson<T>(curr, curr + strlen(curr)).second;
 }
@@ -773,10 +770,9 @@ typename[:T:] ParseJson(char * curr)
  * @param a_in is a string with JSON
  * @return the T structure
  */
-template <std::meta::info T>
-typename[:T:] ParseJson(std::string & a_in)
+template <std::meta::info T> typename[:T:] ParseJson(std::string & a_in)
 {
-  char * curr = (char*) a_in.c_str();
+  char * curr = (char *)a_in.c_str();
   return detail::ObjectParser::ParseJson<T>(curr, curr + a_in.size()).second;
 }
 
@@ -788,10 +784,11 @@ typename[:T:] ParseJson(std::string & a_in)
  * @param a_in is a string_view of input JSON
  * @return the T structure
  */
-template <std::meta::info T>
-typename[:T:] ParseJson(std::string_view a_in)
+template <std::meta::info T> typename[:T:] ParseJson(std::string_view a_in)
 {
-  return detail::ObjectParser::ParseJson<T>((char *) a_in.begin(), (char *) a_in.end()).second;
+  return detail::ObjectParser::ParseJson<T>((char *)a_in.begin(),
+                                            (char *)a_in.end())
+      .second;
 }
 
 } // namespace yjson

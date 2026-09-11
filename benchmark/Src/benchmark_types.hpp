@@ -218,11 +218,17 @@ inline LargeDynamic MakeLargeDynamic(int n)
 {
   LargeDynamic v;
   n = std::min(100, n);
+  // `strings` is std::array<std::string_view, 100> (zero-copy on parse). The
+  // views must reference storage that outlives the returned value, so back
+  // them with a function-local static array of owned std::strings instead of
+  // the temporary produced by "item_" + std::to_string(i), which dangles.
+  static std::array<std::string, 100> str_storage;
   for (std::size_t i = 0; i < n; ++i)
   {
     v.ints[i] = static_cast<int>(i % 1000);
     v.doubles[i] = static_cast<double>(i) * 0.5;
-    v.strings[i] = "item_" + std::to_string(i);
+    str_storage[i] = "item_" + std::to_string(i);
+    v.strings[i] = str_storage[i];
     v.points[i] = Point{static_cast<double>(i), static_cast<double>(i) + 0.5,
                         static_cast<double>(i) + 1.0};
   }

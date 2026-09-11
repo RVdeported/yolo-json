@@ -113,8 +113,9 @@ private:
     }
     else
     {
+      std::string v{value};
       out += '"';
-      out += value;
+      out += v;
       out += '"';
     }
   }

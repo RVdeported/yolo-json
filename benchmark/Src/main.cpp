@@ -1,15 +1,15 @@
 
 
 #include "benchmark_types.hpp"
+#include "serializer.hpp"
 #include "simdjson.h"
-#include <yolo-json/parser.hpp>
-#include <yolo-json/parser.hpp>
 #include <fcntl.h>
 #include <iostream>
-#include "serializer.hpp"
+#include <iterator>
 #include <string>
 #include <utxx/time_val.hpp>
 #include <vector>
+#include <yolo-json/parser.hpp>
 namespace bench
 {
 template <typename T> std::vector<std::string> GenForParse(int a_sz_mb, T & a_v)
@@ -80,8 +80,8 @@ template <typename T> int RunTestOwn(std::vector<std::string> a_samples)
   volatile long sink = 0;
   for (auto & v : a_samples)
   {
-    volatile auto r = yjson::detail::ObjectParser::ParseJson<^^T>(v.data(), v.data() + v.size());
-    sink += static_cast<long>(*r.first);
+    volatile auto r = yjson::ParseJson<^^T>(v);
+    sink += (long)(&r);
   }
 
   return utxx::now_utc().diff_msec(ts);
