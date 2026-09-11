@@ -743,7 +743,7 @@ struct ObjectParser
  * @tparam T reflected type of the object to parse
  * @param curr pointer to the opening '{' of the object
  * @param end one-past-the-end pointer of the input buffer
- * @return a pair of the pointer just past the object and the parsed value
+ * @return the T structure
  */
 template <std::meta::info T>
 typename[:T:] ParseJson(char * curr, char * end)
@@ -751,12 +751,28 @@ typename[:T:] ParseJson(char * curr, char * end)
   return detail::ObjectParser::ParseJson<T>(curr, end).second;
 }
 
+/**
+ * @brief Public entry point: parses a JSON object from the given buffer into a
+ *        value of the annotated struct @a T.
+ *
+ * @tparam T reflected type of the object to parse
+ * @param curr pointer to the opening '{' of the object
+ * @return the T structure
+ */
 template <std::meta::info T>
 typename[:T:] ParseJson(char * curr)
 {
   return detail::ObjectParser::ParseJson<T>(curr, curr + strlen(curr)).second;
 }
 
+/**
+ * @brief Public entry point: parses a JSON object from the given buffer into a
+ *        value of the annotated struct @a T.
+ *
+ * @tparam T reflected type of the object to parse
+ * @param a_in is a string with JSON
+ * @return the T structure
+ */
 template <std::meta::info T>
 typename[:T:] ParseJson(std::string & a_in)
 {
@@ -764,6 +780,14 @@ typename[:T:] ParseJson(std::string & a_in)
   return detail::ObjectParser::ParseJson<T>(curr, curr + a_in.size()).second;
 }
 
+/**
+ * @brief Public entry point: parses a JSON object from the given buffer into a
+ *        value of the annotated struct @a T.
+ *
+ * @tparam T reflected type of the object to parse
+ * @param a_in is a string_view of input JSON
+ * @return the T structure
+ */
 template <std::meta::info T>
 typename[:T:] ParseJson(std::string_view a_in)
 {
