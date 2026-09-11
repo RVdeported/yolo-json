@@ -35,14 +35,15 @@ cd yolo-json
 # Configure (first time; may fetch GoogleTest over SSH)
 cmake -S . -B build
 
-# Build
-cmake --build build
+# Build (generally not required since header-only)
+# cmake --build build
 
 # Install
 cmake --install build --prefix /your/prefix
 ```
 
 Make sure your build has the cpp flags `-freflection -std=c++26`.
+Tests can be run as follows:
 
 ```sh
 cmake -S . -B build -DBUILD_TESTS=ON
@@ -86,18 +87,20 @@ int main()
 {
   char json[] = R"({ "name" : "Ada" , "age" : 36 , "email" : "ada@example.org" })";
 
-  auto [rest, person] = yjson::ParseJson<^^Person>(
-      json, json + std::strlen(json));
+  Person person = yjson::ParseJson<^^Person>(json);
 
   std::cout << person.name << " is " << person.age << '\n';
   // rest points just past the closing '}'
 }
 ```
 
-`ParseJson` returns a `std::pair<char*, T>`: the first element is the pointer  
-just past the parsed value, the second is the populated struct. It parses the  
-buffer **in place**, so the input must be mutable and, if you use  
+It parses the buffer **in place**, so the input must be mutable and, if you use  
 `std::string_view` fields, must outlive the result.
+
+You can build that with g++ by passing the include paths and the required flags:
+```sh
+g++ main.cpp -std=c++26 -freflection -I./Include/
+```
 
 By default, fields are expected in struct declaration order and the JSON is  
 assumed to be tightly packed. Add `NotCompressed` to tolerate whitespace, and  

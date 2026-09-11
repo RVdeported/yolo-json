@@ -23,7 +23,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <utils.hpp>
+#include <yolo-json/utils.hpp>
 
 namespace benchmark_types
 {
@@ -227,7 +227,7 @@ inline LargeDynamic MakeLargeDynamic(int n)
                         static_cast<double>(i) + 1.0};
   }
 
-  int rows = n / 10 + 1;
+  int rows = n / 10;
   for (std::size_t r = 0; r < rows; ++r)
   {
     for (std::size_t c = 0; c < rows; ++c)

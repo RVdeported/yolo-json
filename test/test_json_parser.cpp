@@ -2,10 +2,8 @@
 //                    "test_json_parser.cpp":                                //
 //           Tests for Include/json_parser.hpp utilities                     //
 //===========================================================================//
-#include "Include/json_parser.hpp"
-
+#include <yolo-json/json_parser.hpp>
 #include <gtest/gtest.h>
-
 #include <cstring>
 #include <string>
 

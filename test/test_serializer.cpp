@@ -2,8 +2,8 @@
 //                    "test_serializer.cpp":                                 //
 //      End-to-end tests for Include/serializer.hpp (yjson::SerializeJson)   //
 //===========================================================================//
-#include "Include/parser.hpp"
-#include "benchmark/Src/serializer.hpp"
+#include <yolo-json/parser.hpp>
+#include <benchmark/Src/serializer.hpp>
 
 #include <gtest/gtest.h>
 
@@ -123,7 +123,7 @@ namespace
 template <typename T> T Parse(std::string json)
 {
   auto [rest, value] =
-      yjson::ParseJson<^^T>(json.data(), json.data() + json.size());
+      yjson::detail::ObjectParser::ParseJson<^^T>(json.data(), json.data() + json.size());
   (void)rest;
   return value;
 }
@@ -199,7 +199,7 @@ TEST(SerializerTest, RoundTripsStringViewField)
   std::string json = yjson::SerializeJson<^^test_types::StringViewFld>(
       test_types::StringViewFld{42, "hello"}, 7);
   EXPECT_EQ(json, R"({"i":42,"s":"hello"})");
-  auto [rest, v] = yjson::ParseJson<^^test_types::StringViewFld>(
+  auto [rest, v] = yjson::detail::ObjectParser::ParseJson<^^test_types::StringViewFld>(
       json.data(), json.data() + json.size());
   (void)rest;
   EXPECT_EQ(v.i, 42);

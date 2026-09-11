@@ -2,8 +2,8 @@
 //                    "test_annotations.cpp":                                 //
 //      Tests for struct/field annotation extraction and field ordering       //
 //===========================================================================//
-#include "Include/parser.hpp"
-#include "Include/utils.hpp"
+#include <yolo-json/parser.hpp>
+#include <yolo-json/utils.hpp>
 
 #include <gtest/gtest.h>
 

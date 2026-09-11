@@ -7,6 +7,7 @@
 #include "utils.hpp"
 #include <cassert>
 #include <cstring>
+#include <memory>
 #include <meta>
 
 //! Reflection-driven JSON parser for annotated structs.
@@ -122,7 +123,7 @@ template <std::meta::info T, char Delim1 = ',', bool Ignore = false,
           int MinSz = 0, int FxSz = -1, char Delim2 = Delim1>
 std::pair<char *, typename[:T:]> ParseBase(char * curr, char * end)
 {
-  static_assert(IsBase<T>());
+  // std::cout << curr << '\n';
   constexpr int AddLen = MinSz > FxSz ? MinSz : FxSz;
   constexpr bool integral = std::meta::is_integral_type(T);
   constexpr bool floating = std::meta::is_floating_point_type(T);
@@ -745,9 +746,28 @@ struct ObjectParser
  * @return a pair of the pointer just past the object and the parsed value
  */
 template <std::meta::info T>
-std::pair<char *, typename[:T:]> ParseJson(char * curr, char * end)
+typename[:T:] ParseJson(char * curr, char * end)
 {
-  return detail::ObjectParser::ParseJson<T>(curr, end);
+  return detail::ObjectParser::ParseJson<T>(curr, end).second;
+}
+
+template <std::meta::info T>
+typename[:T:] ParseJson(char * curr)
+{
+  return detail::ObjectParser::ParseJson<T>(curr, curr + strlen(curr)).second;
+}
+
+template <std::meta::info T>
+typename[:T:] ParseJson(std::string & a_in)
+{
+  char * curr = (char*) a_in.c_str();
+  return detail::ObjectParser::ParseJson<T>(curr, curr + a_in.size()).second;
+}
+
+template <std::meta::info T>
+typename[:T:] ParseJson(std::string_view a_in)
+{
+  return detail::ObjectParser::ParseJson<T>((char *) a_in.begin(), (char *) a_in.end()).second;
 }
 
 } // namespace yjson

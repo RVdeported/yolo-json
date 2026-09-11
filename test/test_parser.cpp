@@ -1,8 +1,8 @@
 //===========================================================================//
 //                    "test_parser.cpp":                                     //
-//     End-to-end tests for Include/parser.hpp (yjson::ParseJson)            //
+//     End-to-end tests for Include/parser.hpp (yjson::detail::ObjectParser::ParseJson)            //
 //===========================================================================//
-#include "Include/parser.hpp"
+#include <yolo-json/parser.hpp>
 
 #include <gtest/gtest.h>
 
@@ -468,7 +468,7 @@ namespace
 template <typename T> T Parse(std::string json)
 {
   auto [rest, value] =
-      yjson::ParseJson<^^T>(json.data(), json.data() + json.size());
+      yjson::detail::ObjectParser::ParseJson<^^T>(json.data(), json.data() + json.size());
   (void)rest;
   return value;
 }
@@ -492,7 +492,7 @@ TEST(ParseJsonTest, ParsesBasicTypes)
 TEST(ParseJsonTest, ParsesStringViewField)
 {
   std::string json = R"({"i":7,"s":"hello"})";
-  auto [rest, v] = yjson::ParseJson<^^test_types::StringViewFld>(
+  auto [rest, v] = yjson::detail::ObjectParser::ParseJson<^^test_types::StringViewFld>(
       json.data(), json.data() + json.size());
   (void)rest;
   EXPECT_EQ(v.i, 7);
@@ -504,7 +504,7 @@ TEST(ParseJsonTest, ParsesStringViewField)
 TEST(ParseJsonTest, ParsesVectorOfStringViews)
 {
   std::string json = R"({"v":["a","bb"],"rest":3})";
-  auto [rest, v] = yjson::ParseJson<^^test_types::VectorOfStringViews>(
+  auto [rest, v] = yjson::detail::ObjectParser::ParseJson<^^test_types::VectorOfStringViews>(
       json.data(), json.data() + json.size());
   (void)rest;
   ASSERT_EQ(v.v.size(), 2u);
@@ -759,7 +759,7 @@ TEST(ParseJsonTest, ReturnsPointerPastClosingBrace)
 {
   char buf[] = R"({"a":1,"b":2})";
   auto [after, value] =
-      yjson::ParseJson<^^test_types::Pair>(buf, buf + std::strlen(buf));
+      yjson::detail::ObjectParser::ParseJson<^^test_types::Pair>(buf, buf + std::strlen(buf));
   EXPECT_EQ(after, buf + std::strlen(buf));
   EXPECT_EQ(value.a, 1);
   EXPECT_EQ(value.b, 2);
@@ -772,7 +772,7 @@ TEST(ParseJsonTest, OptionalFieldAbsent)
 {
   char buf[] = R"({"rest":9})";
   auto [rest, v] =
-      yjson::ParseJson<^^test_types::Opt>(buf, buf + std::strlen(buf));
+      yjson::detail::ObjectParser::ParseJson<^^test_types::Opt>(buf, buf + std::strlen(buf));
   (void)rest;
   EXPECT_FALSE(v.opt.has_value());
   EXPECT_EQ(v.rest, 9);
@@ -784,12 +784,12 @@ TEST(ParseJsonTest, OptionalFieldAbsent)
 TEST(ParseJsonTest, BooleanLiterals)
 {
   char t[] = R"({"f":true})";
-  auto [rt, vt] = yjson::ParseJson<^^test_types::Booly>(t, t + std::strlen(t));
+  auto [rt, vt] = yjson::detail::ObjectParser::ParseJson<^^test_types::Booly>(t, t + std::strlen(t));
   (void)rt;
   EXPECT_TRUE(vt.f);
 
   char f[] = R"({"f":false})";
-  auto [rf, vf] = yjson::ParseJson<^^test_types::Booly>(f, f + std::strlen(f));
+  auto [rf, vf] = yjson::detail::ObjectParser::ParseJson<^^test_types::Booly>(f, f + std::strlen(f));
   (void)rf;
   EXPECT_FALSE(vf.f);
 }
@@ -801,7 +801,7 @@ TEST(ParseJsonTest, StringInMiddle)
 {
   char buf[] = R"({"a":3,  "b" : "333"  ,   "c": 56})";
   auto [rest, v] =
-      yjson::ParseJson<^^test_types::StrMiddle>(buf, buf + std::strlen(buf));
+      yjson::detail::ObjectParser::ParseJson<^^test_types::StrMiddle>(buf, buf + std::strlen(buf));
   (void)rest;
   EXPECT_EQ(v.a, 3);
   EXPECT_EQ(v.b, "333");

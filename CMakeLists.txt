@@ -97,7 +97,7 @@ ENDIF()
 #=============================================================================#
 INCLUDE(GNUInstallDirs)
 
-INSTALL(DIRECTORY ${CMAKE_SOURCE_DIR}/Include/
+INSTALL(DIRECTORY ${CMAKE_SOURCE_DIR}/Include/yolo-json/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJ_NAME})
 
 SET(UTXX_INSTALL_HEADERS

@@ -2,7 +2,8 @@
 
 #include "benchmark_types.hpp"
 #include "simdjson.h"
-#include "parser.hpp"
+#include <yolo-json/parser.hpp>
+#include <yolo-json/parser.hpp>
 #include <fcntl.h>
 #include <iostream>
 #include "serializer.hpp"
@@ -26,7 +27,7 @@ template <typename T> std::vector<std::string> GenForParse(int a_sz_mb, T & a_v)
 
 template <typename T = benchmark_types::LargeDynamic> T GetSample()
 {
-  return benchmark_types::MakeLargeDynamic(99);
+  return benchmark_types::MakeLargeDynamic(100);
 }
 template <> benchmark_types::LargeFixed GetSample()
 {
@@ -79,7 +80,7 @@ template <typename T> int RunTestOwn(std::vector<std::string> a_samples)
   volatile long sink = 0;
   for (auto & v : a_samples)
   {
-    volatile auto r = yjson::ParseJson<^^T>(v.data(), v.data() + v.size());
+    volatile auto r = yjson::detail::ObjectParser::ParseJson<^^T>(v.data(), v.data() + v.size());
     sink += static_cast<long>(*r.first);
   }
 
