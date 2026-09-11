@@ -178,7 +178,7 @@ std::optional<int> user_id;
 ## Project layout
 
 ```
-Include/            Library headers (namespace yjson)
+Include/yolo-json   Library headers (namespace yjson)
   parser.hpp        Reflection parser: ParseJson, ParseBase, GetOrderedField
   json_parser.hpp   Low-level JSON scanning (JSONParser namespace)
   utils.hpp         Annotations, StructAnnots/FieldAnnots, type traits
