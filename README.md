@@ -51,6 +51,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+IMPORTANT!
+Yolo-json skips validation in Release mode. The proposed workflow is to build application with `DCMAKE_BUILT_TYPE=Debug`, ensure that the assertions are not triggered on real JSON and only then compile with `DCMAKE_BUILD_TYPE=Release`.
+
+Doxygen html can be built by
+```sh
+doxygen Doxyfile
+```
+
 ### Install (header-only)
 
 ```sh
