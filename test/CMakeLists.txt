@@ -7,18 +7,18 @@ ENABLE_TESTING()
 
 FIND_PACKAGE(GTest)
 
-IF (NOT googletest_FOUND)
+IF (NOT GTest_FOUND)
   FETCHCONTENT_DECLARE(
-    googletest
+    GTest
     GIT_REPOSITORY git@github.com:google/googletest.git
     GIT_TAG        v1.15.2
   )
 
-  FetchContent_MakeAvailable(googletest)
+  FetchContent_MakeAvailable(GTest)
 ENDIF()
 
 INCLUDE(GoogleTest)
-FOREACH(TEST json_parser parser annotations serializer) 
+FOREACH(TEST json_parser parser annotations serializer tokenizer) 
   ADD_EXECUTABLE(test_${TEST} test_${TEST}.cpp)
 
   TARGET_INCLUDE_DIRECTORIES(
