@@ -8,7 +8,7 @@ int main()
 {
   constexpr static auto s = std::meta::reflect_constant_string(R"(
 {
-  "type": ["object", "null"],
+  "type": "object",
   "properties": {
     "name": { "type": "string"},
     "age":  { "type": "integer", "minimum": 0 }
@@ -20,6 +20,8 @@ int main()
   // constexpr auto tokens = yjson::Tokenize<s>();
   // for (auto v : tokens)
   //   std::cout << v.text << '\n';
+  typename[:a:] t{"NAME", 34};
+  std::cout << t.name << '\n';
   std::cout << std::meta::display_string_of(a) << '\n';
   std::cout << "Done\n";
   return 0;
