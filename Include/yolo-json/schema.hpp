@@ -13,45 +13,73 @@
 namespace yjson
 {
 
+//========================================================//
+// Helper functions                                       //
+//========================================================//
+
+// TODO: make the traceback
 consteval void ExpectType(const Token a_in, const TokenType a_t)
 {
   if (a_in.type != a_t)
     throw std::invalid_argument("Schema encountered unexpected token");
 }
 
+// TODO: make the traceback (I think there in utxx there was something
+// useful)
 consteval void ExpectVal(const Token a_in, const std::string_view a_v)
 {
   if (a_in.text != a_v)
     throw std::invalid_argument("Schema have unexpected val");
 }
 
+//========================================================//
+// Internal schema parser implementation                  //
+//========================================================//
 namespace detail
 {
 
+//--------------------------------------------------------//
+// Val                                                    //
+//--------------------------------------------------------//
+//! @class Val 
+//! @brief Holds result of schema parcing
 struct Val
 {
-  std::meta::info type;             // base type
-  std::vector<std::meta::info> ann; // annotations
-  int end_idx;
+  //! @brief Type of the object
+  std::meta::info type;             
+  //! @brief List of annotations extracted
+  std::vector<std::meta::info> ann; 
 };
 
+//--------------------------------------------------------//
+// ParseRawNum                                            //
+//--------------------------------------------------------//
+//! @brief Number concept
 template <typename T>
 concept Number = std::integral<T> || std::floating_point<T>;
+
+//! @brief Consteval parser of numbers
+//! @param a_sv string to parse
+//! @tparam T type of a number
+//! @return Parsed number
 template <typename T>
 consteval T ParseRawNum(std::string_view a_sv)
   requires Number<T>
 {
   T out{};
+  // XXX: Do we care if exception?
   (void)std::from_chars(a_sv.data(), a_sv.data() + a_sv.size(), out);
 
   return out;
 }
 
-/**
- * @brief Strips the enclosing double quotes from a JSON string lexeme.
- * @param s the lexeme (e.g. @c "\"name\"")
- * @return the inner text (@c "name"), or @a s unchanged when not quoted
- */
+
+//--------------------------------------------------------//
+// Unquote                                                //
+//--------------------------------------------------------//
+//! @brief Strips the enclosing double quotes from a JSON string lexeme.
+//! @param s the lexeme (e.g. @c "\"name\"")
+//! @return the inner text (@c "name"), or @a s unchanged when not quoted
 consteval std::string_view Unquote(std::string_view s)
 {
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
@@ -65,11 +93,11 @@ consteval std::string_view Unquote(std::string_view s)
 //! Carrier for an injected aggregate type.
 //!
 //! `define_aggregate` must be evaluated from a `consteval` block enclosed by
-//! the scope of the type being defined ([expr.const]/31), so a function-local
+//! the scope of the type being defined, so a function-local
 //! `struct` cannot be completed by it. Instead the aggregate is materialized
 //! as `Inner`, a nested class of a class template keyed by the member specs;
 //! instantiating `SchemaType<Ms...>` runs the `consteval` block and completes
-//! `Inner` (same shape as the GCC testsuite's json-parser.C).
+//! `Inner`.
 template <std::meta::info... Ms> struct SchemaType
 {
   struct Inner;
@@ -225,12 +253,15 @@ struct SchemaParser
    *  - @c std::tuple<Ts...> for "prefixItems" (or a draft-07 "items" array),
    *    with a trailing @c std::vector<T> when "items" is also present.
    *
+   * When "minItems" and "maxItems" are both given and equal, the returned
+   * @c Val also carries a @c StaticSize annotation, so the field is parsed by
+   * the fixed-count unrolled parser.
+   *
    * @tparam S constant-string reflection of the whole schema
    * @param idx current token index (updated in place)
-   * @return the reflection of the selected container type
+   * @return the selected container type together with its field annotations
    */
-  template <std::meta::info S>
-  static consteval std::meta::info GetSchemaArray(int & idx)
+  template <std::meta::info S> static consteval Val GetSchemaArray(int & idx)
   {
     constexpr auto tokens = Tokenize<S>();
 
@@ -318,23 +349,34 @@ struct SchemaParser
 
     ExpectType(tokens[idx], TokenType::ObjectEnd); // leave idx on '}'
 
+    // A matching "minItems"/"maxItems" pair fixes the element count, so tag
+    // the container with a StaticSize annotation for the unrolled parser.
+    std::vector<std::meta::info> anns;
+    if (min_items >= 0 && min_items == max_items)
+      anns.push_back(std::meta::reflect_constant(StaticSize{min_items}));
+
+    std::meta::info ret;
     if (!prefix.empty())
     {
       if (has_items)
         prefix.emplace_back(std::meta::substitute(^^std::vector, {items}));
-      return std::meta::substitute(^^std::tuple, prefix);
+      ret = std::meta::substitute(^^std::tuple, prefix);
     }
-
-    if (has_items)
+    else if (has_items)
     {
       if (max_items > 0)
-        return std::meta::substitute(
+        ret = std::meta::substitute(
             ^^std::array, {items, std::meta::reflect_constant(max_items)});
-      return std::meta::substitute(^^std::vector, {items});
+      else
+        ret = std::meta::substitute(^^std::vector, {items});
+    }
+    else
+    {
+      throw std::invalid_argument(
+          R"(Array schema has neither "items" nor "prefixItems")");
     }
 
-    throw std::invalid_argument(
-        R"(Array schema has neither "items" nor "prefixItems")");
+    return {ret, anns};
   }
 
   /**
@@ -399,10 +441,18 @@ struct SchemaParser
     else if (type == R"("boolean")")
       base_t = ^^bool;
     else if (type == R"("array")")
-      base_t = GetSchemaArray<S>(idx);
+    {
+      Val v = GetSchemaArray<S>(idx);
+      base_t = v.type;
+      anns.insert(anns.end(), v.ann.begin(), v.ann.end());
+    }
     else
       throw std::invalid_argument(R"(Unexpected type)");
-    anns = GetSchemaAnnotations<S>(idx);
+    
+    // XXX: We actually need to get annotations only for basic types.
+    // The other cases should be handled within their own parsers
+    std::vector<std::meta::info> field_anns = GetSchemaAnnotations<S>(idx);
+    anns.insert(anns.end(), field_anns.begin(), field_anns.end());
 
     if (is_null)
       base_t = std::meta::substitute(^^std::optional, {

@@ -120,3 +120,44 @@ TEST(SchemaArrayTest, ObjectWithArrayFields)
   EXPECT_EQ(v.scores[0], 7);
 }
 
+//---------------------------------------------------------------------------//
+// Fixed-size arrays carry a StaticSize field annotation:                    //
+//---------------------------------------------------------------------------//
+TEST(SchemaArrayAnnotTest, FixedArrayGetsStaticSize)
+{
+  constexpr auto t = PARSE(
+      R"({
+        "type": "object",
+        "properties": {
+          "values": { "type": "array", "items": { "type": "integer" },
+                      "minItems": 4, "maxItems": 4 }
+        },
+        "required": ["values"]
+      })");
+  using T = typename[:t:];
+  static_assert(std::is_same_v<decltype(T{}.values), std::array<int, 4>>);
+
+  constexpr auto anns = yjson::FieldAnnots::MkFldAnnots<t>();
+  static_assert(anns.size() == 1u);
+  static_assert(anns[0].m_static_sz == 4);
+}
+
+TEST(SchemaArrayAnnotTest, MaxOnlyArrayHasNoStaticSize)
+{
+  constexpr auto t = PARSE(
+      R"({
+        "type": "object",
+        "properties": {
+          "values": { "type": "array", "items": { "type": "integer" },
+                      "maxItems": 4 }
+        },
+        "required": ["values"]
+      })");
+  using T = typename[:t:];
+  static_assert(std::is_same_v<decltype(T{}.values), std::array<int, 4>>);
+
+  constexpr auto anns = yjson::FieldAnnots::MkFldAnnots<t>();
+  static_assert(anns.size() == 1u);
+  static_assert(anns[0].m_static_sz == -1);
+}
+
