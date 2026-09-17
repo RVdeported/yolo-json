@@ -262,6 +262,12 @@ struct FieldAnnots
       ann.m_static_sz = std::meta::extract<StaticSize>(st_sz[0])._Sz;
     }
 
+    if constexpr (constexpr auto min_sz = get_annotations<^^MinSize, fld>();
+                  min_sz.size() > 0)
+    {
+      ann.m_min_sz = std::meta::extract<MinSize>(min_sz[0])._Sz;
+    }
+
     if constexpr (get_annotations<^^Ignore, fld>().size() > 0)
     {
       ann.m_ignore = true;

@@ -145,8 +145,8 @@ struct SchemaParser
       if (tokens[idx].text == R"("minLength")")
       {
         ExpectType(tokens[++idx], TokenType::Colon);
-        MinSize a{ParseRawNum<int>(tokens[++idx].text)};
-        anns.push_back(^^a);
+        anns.push_back(std::meta::reflect_constant(
+            MinSize{ParseRawNum<int>(tokens[++idx].text)}));
       }
       else
       {
@@ -226,8 +226,8 @@ struct SchemaParser
     {
       if (!required[i])
       {
-        MayAbsent a{};
-        members[i].second.ann.push_back(^^a);
+        members[i].second.ann.push_back(
+            std::meta::reflect_constant(MayAbsent{}));
       }
       std::meta::info t = members[i].second.type;
       specs.emplace_back(
