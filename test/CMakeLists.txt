@@ -18,7 +18,7 @@ IF (NOT GTest_FOUND)
 ENDIF()
 
 INCLUDE(GoogleTest)
-FOREACH(TEST json_parser parser annotations serializer tokenizer) 
+FOREACH(TEST json_parser parser annotations serializer tokenizer schema) 
   ADD_EXECUTABLE(test_${TEST} test_${TEST}.cpp)
 
   TARGET_INCLUDE_DIRECTORIES(

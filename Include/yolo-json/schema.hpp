@@ -1,11 +1,14 @@
 #pragma once
 #include "tokenizer.hpp"
 #include "utils.hpp"
+#include <array>
 #include <charconv>
 #include <cstdlib>
 #include <format>
 #include <meta>
 #include <stdexcept>
+#include <tuple>
+#include <vector>
 
 namespace yjson
 {
@@ -209,11 +212,138 @@ struct SchemaParser
   }
 
   /**
+   * @brief Parses the "prefixItems" / "items" / "minItems" / "maxItems"
+   *        sections of an array type and selects the matching container type.
+   *
+   * Called with @a idx on the ',' right after the "array" type value. Leaves
+   * @a idx on the '}' closing the type descriptor.
+   *
+   * The resulting type is:
+   *  - @c std::vector<T> for a homogeneous "items" schema of unbounded length;
+   *  - @c std::array<T, N> for a homogeneous "items" schema whose "minItems"
+   *    equals "maxItems";
+   *  - @c std::tuple<Ts...> for "prefixItems" (or a draft-07 "items" array),
+   *    with a trailing @c std::vector<T> when "items" is also present.
+   *
+   * @tparam S constant-string reflection of the whole schema
+   * @param idx current token index (updated in place)
+   * @return the reflection of the selected container type
+   */
+  template <std::meta::info S>
+  static consteval std::meta::info GetSchemaArray(int & idx)
+  {
+    constexpr auto tokens = Tokenize<S>();
+
+    std::vector<std::meta::info> prefix; // element types of the tuple part
+    std::meta::info items{};             // homogeneous element type
+    bool has_items = false;
+    int min_items = -1;
+    int max_items = -1;
+
+    while (tokens[idx].type == TokenType::Comma)
+    {
+      idx++;                              // consume ','
+      ExpectType(tokens[idx], TokenType::String); // key
+      std::string_view key = tokens[idx].text;
+      idx++;                              // consume key
+      ExpectType(tokens[idx], TokenType::Colon);
+      idx++;                              // consume ':'
+
+      if (key == R"("prefixItems")")
+      {
+        ExpectType(tokens[idx], TokenType::ArrayBegin);
+        idx++;                            // consume '['
+        while (tokens[idx].type != TokenType::ArrayEnd)
+        {
+          ExpectType(tokens[idx], TokenType::ObjectBegin);
+          idx++;                          // consume '{'
+          Val v = GetSchemaObj<S>(idx);
+          ExpectType(tokens[idx], TokenType::ObjectEnd);
+          idx++;                          // consume '}'
+          prefix.emplace_back(v.type);
+          if (tokens[idx].type == TokenType::Comma)
+            idx++;
+        }
+        ExpectType(tokens[idx], TokenType::ArrayEnd);
+        idx++;                            // consume ']'
+      }
+      else if (key == R"("items")")
+      {
+        if (tokens[idx].type == TokenType::ArrayBegin)
+        {
+          // Draft-07 style tuple: "items" given as an array of schemas.
+          idx++;                          // consume '['
+          while (tokens[idx].type != TokenType::ArrayEnd)
+          {
+            ExpectType(tokens[idx], TokenType::ObjectBegin);
+            idx++;                        // consume '{'
+            Val v = GetSchemaObj<S>(idx);
+            ExpectType(tokens[idx], TokenType::ObjectEnd);
+            idx++;                        // consume '}'
+            prefix.emplace_back(v.type);
+            if (tokens[idx].type == TokenType::Comma)
+              idx++;
+          }
+          ExpectType(tokens[idx], TokenType::ArrayEnd);
+          idx++;                          // consume ']'
+        }
+        else
+        {
+          ExpectType(tokens[idx], TokenType::ObjectBegin);
+          idx++;                          // consume '{'
+          Val v = GetSchemaObj<S>(idx);
+          ExpectType(tokens[idx], TokenType::ObjectEnd);
+          idx++;                          // consume '}'
+          items = v.type;
+          has_items = true;
+        }
+      }
+      else if (key == R"("minItems")")
+      {
+        ExpectType(tokens[idx], TokenType::Number);
+        min_items = ParseRawNum<int>(tokens[idx].text);
+        idx++;                            // consume the number
+      }
+      else if (key == R"("maxItems")")
+      {
+        ExpectType(tokens[idx], TokenType::Number);
+        max_items = ParseRawNum<int>(tokens[idx].text);
+        idx++;                            // consume the number
+      }
+      else
+      {
+        idx++; // skip the unsupported keyword's scalar value
+      }
+    }
+
+    ExpectType(tokens[idx], TokenType::ObjectEnd); // leave idx on '}'
+
+    if (!prefix.empty())
+    {
+      if (has_items)
+        prefix.emplace_back(std::meta::substitute(^^std::vector, {items}));
+      return std::meta::substitute(^^std::tuple, prefix);
+    }
+
+    if (has_items)
+    {
+      if (max_items > 0)
+        return std::meta::substitute(
+            ^^std::array, {items, std::meta::reflect_constant(max_items)});
+      return std::meta::substitute(^^std::vector, {items});
+    }
+
+    throw std::invalid_argument(
+        R"(Array schema has neither "items" nor "prefixItems")");
+  }
+
+  /**
    * @brief Parses a type descriptor @c {"type": <T> [,...]} into a Val.
    *
    * Called with @a idx on the "type" key. Handles a plain type string, an
    * array of types (only "null" is accepted as a second element), the field
-   * annotations of scalar types and the object structure of "object" types.
+   * annotations of scalar types, the object structure of "object" types and
+   * the array structure of "array" types.
    * Leaves @a idx on the '}' closing the type descriptor.
    *
    * @tparam S constant-string reflection of the whole schema
@@ -269,7 +399,7 @@ struct SchemaParser
     else if (type == R"("boolean")")
       base_t = ^^bool;
     else if (type == R"("array")")
-      base_t = ^^std::string_view;
+      base_t = GetSchemaArray<S>(idx);
     else
       throw std::invalid_argument(R"(Unexpected type)");
     anns = GetSchemaAnnotations<S>(idx);
