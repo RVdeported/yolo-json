@@ -135,6 +135,34 @@ struct[[= yjson::RandomOrder{}]] Basket
   int count;
 };
 ```
+Import of JSON schemas are supported as well:
+```cpp
+//!tmp.json
+//{
+//   "type": "object",
+//   "properties": {
+//     "name": { "type": "string"},
+//     "age":  { "type": "integer", "minimum": 0 }
+//   },
+//   "required": ["name", "age"]
+// }
+#include <yolo-json/parser.hpp>
+#include <yolo-json/schema.hpp>
+#include <cstring>
+
+int main()
+{
+  constexpr char s[] = {
+    #embed "tmp.json"
+  };
+  constexpr auto jsonType =
+      yjson::ParseSchema<std::meta::reflect_constant_string(s)>();
+  using T = typename[:jsonType:];
+    
+  char * input = R"({"name":"Alex","age":22})";
+  T out = yjson::ParseJson<jsonType>(input);
+}
+```
 
 ### Annotation reference
 
